@@ -101,6 +101,7 @@ def create_tile(img, name, x , y):
     layer.name = name
     layer.set_offsets(x, y)
     img.add_layer(layer, 0)
+    
 ###########################################################
 #
 #
@@ -132,8 +133,9 @@ def prepareImage(img, tileW, tileH):
 def make_seamless_internal(img, layer, tileName, tileW, tileH, dir):
     sel = eval("get_" + tileName+ "_selection(tileW, tileH)")
     pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
-    pdb.gimp_selection_grow(img,1)
+    #pdb.gimp_selection_grow(img,0)
     pdb.gimp_edit_copy(layer)
+    
     top_half = pdb.gimp_edit_paste(layer, False)
     pdb.gimp_floating_sel_to_layer(top_half)
     pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
@@ -151,32 +153,24 @@ def make_seamless_internal(img, layer, tileName, tileW, tileH, dir):
     pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
     pdb.gimp_selection_invert(img)
     pdb.gimp_edit_cut(combined_layer)
+    return combined_layer
 
 ###########################################################
 #
 #
 ###########################################################
-def make_seamless(img, layer, tileW, tileH):
-    make_seamless_internal(img, layer, "le" , tileW, tileH, "")
-    make_seamless_internal(img, layer, "ue" , tileW, tileH, "tldr")
-    make_seamless_internal(img, layer, "re" , tileW, tileH, "")
-    make_seamless_internal(img, layer, "de" , tileW, tileH, "tldr")
-
-###########################################################
-#
-#
-###########################################################
-def select_transition(img, layer, tileName, tileW, tileH):
+def select_transition(img, layer, tileName, tileW, tileH, grow=0):
     sel = eval("get_" + tileName+ "_selection(tileW, tileH)")
     pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
+    pdb.gimp_selection_grow(img,grow)
 
 ###########################################################
 #
 #
 ###########################################################
-def get_slice(img, layer, tileName, sliceType, tileW, tileH, grow=2):
-    dx=tileW/2*0.8
-    dy=tileH/2*0.8
+def get_slice(img, layer, tileName, sliceType, tileW, tileH, grow=0):
+    dx=int(tileW/2*0.8)
+    dy=int(tileH/2*0.8)
     sel = eval("get_" + tileName+ "_selection(tileW, tileH)")
     if sliceType == "nw":
         sel[4] -= dx; sel[6] -= dx
@@ -193,10 +187,15 @@ def get_slice(img, layer, tileName, sliceType, tileW, tileH, grow=2):
     pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
     pdb.gimp_selection_grow(img,grow)
 
+###########################################################
+#
+#
+###########################################################
 def create_outside_corner(img, layer, cornerType, tileW, tileH):
-    dx=tileW/2*0.8
-    dy=tileH/2*0.8
-    if cornerType=="lle": edges=["le","de"]; sliceType=["ne","sw"]
+    if cornerType=="lle": edges=["le","de"]; sliceType=["ne","se"]
+    if cornerType=="ule": edges=["le","ue"]; sliceType=["sw","se"]
+    if cornerType=="ure": edges=["ue","re"]; sliceType=["nw","sw"]
+    if cornerType=="lre": edges=["re","de"]; sliceType=["ne","nw"]
 
     #Hide the tile where the corner is supposed to be created
     select_transition(img, layer, cornerType, tileW, tileH)
@@ -208,32 +207,56 @@ def create_outside_corner(img, layer, cornerType, tileW, tileH):
         pdb.gimp_edit_copy(layer)
         #select and paste slice
         get_slice(img, layer,cornerType, sliceType[index], tileW, tileH)
-        pdb.gimp_edit_paste(layer, True)
-    
+        selId= pdb.gimp_edit_paste(layer, True)
+        pdb.gimp_floating_sel_anchor(selId)
         
+###########################################################
+#
+#
+###########################################################    
+def create_outside_corners(img, layer, tileW, tileH):
+    #create_outside_corner(img, layer, "lle", tileW, tileH)
+    #create_outside_corner(img, layer, "ule", tileW, tileH)
+    create_outside_corner(img, layer, "ure", tileW, tileH)
+    #create_outside_corner(img, layer, "lre", tileW, tileH)
 
+###########################################################
+#
+#
+###########################################################
+def make_seamless(img, layer, tileW, tileH):
+    l1=make_seamless_internal(img, layer, "le" , tileW, tileH, "")
+    l2=make_seamless_internal(img, layer, "ue" , tileW, tileH, "tldr")
+    l3=make_seamless_internal(img, layer, "re" , tileW, tileH, "")
+    l4=make_seamless_internal(img, layer, "de" , tileW, tileH, "tldr")
+    pdb.gimp_image_merge_down(img, l4, 2)
+    pdb.gimp_image_merge_down(img, l3, 2)
+    pdb.gimp_image_merge_down(img, l2, 2)
+    layer=pdb.gimp_image_merge_down(img, l1, 2)
+    create_outside_corners(img,layer,tileW,tileH)
 
+###########################################################
 # execfile('/Users/alexjecu/Desktop/Workspace/dinsight/xamarin/assets/tiles/scripts/gimp-grid.py')
 #image= gimp.image_list()[0]
 #outputFolder = "/Users/alexjecu/Desktop/Workspace/dinsight/xamarin/assets/tiles/Gimp"
+###########################################################
 register(
-         "python_fu_create_outside_corner",
-         N_("Create Outside Corner"),
-         """Create Outside Corner""",
+         "python_fu_create_outside_corners",
+         N_("Create Outside Corners"),
+         """Create Outside Corners""",
          "Alex Cotoman",
          "Alex Cotoman",
          "2019",
-         _("_Create Outside Corner..."),
+         _("_Create Outside Corners..."),
          "*",
          [
           (PF_IMAGE, "image", "Input image", None),
           (PF_DRAWABLE, "layer", "Input layer", None),
-          (PF_STRING, "cornerType", "Tile Name (lle,ule,ure,lre)", None),
           (PF_INT, "tileW", "Tile Width", 128),
           (PF_INT, "tileH", "Tile Height", 64)
           ],
          [],
-         create_outside_corner,
+         create_outside_corners,
          menu="<Image>/Filters/Alex's/Tile Library",
          domain=("gimp20-python", gimp.locale_directory))
 
