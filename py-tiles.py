@@ -22,14 +22,18 @@ def get_ure_selection(tileW, tileH): return [2* tileW, tileH + tileH/2, 2 *tileW
 def get_re_selection(tileW, tileH): return [tileW + tileW/2, 2 * tileH, 2 * tileW, tileH + tileH/2, 2 * tileW + tileW/2, 2 * tileH, 2 * tileW, 2 * tileH + tileH/2]
 def get_lre_selection(tileW, tileH): return [tileW, 2 * tileH + tileH/2, tileW + tileW/2, 2 * tileH, 2 * tileW, 2 * tileH + tileH/2, tileW + tileW/2, 3 * tileH]
 def get_de_selection(tileW, tileH): return [tileW/2, 2 * tileH, tileW, tileH + tileH/2, tileW + tileW/2, 2 * tileH, tileW, 2 * tileH + tileH/2 ]
+def get_ic_n_selection(tileW, tileH): return [tileW/2, tileH/2, tileW, 0, tileW/2+tileW, tileH/2, tileW, tileH]
+def get_ic_s_selection(tileW, tileH): return [tileW/2, tileH/2+tileH, tileW, tileH, tileW+tileW/2, tileH+tileH/2, tileW, 2*tileH]
+def get_ic_e_selection(tileW, tileH): return [tileW, tileH, tileW+tileW/2, tileH/2, 2*tileW, tileH, tileW+tileW/2, tileH+tileH/2]
+def get_ic_w_selection(tileW, tileH): return [0, tileH, tileW/2, tileH/2, tileW, tileH, tileW/2, tileH + tileH/2]
+
 ###########################################################
 #
 #
 ###########################################################
-def export_transitions(image, layer_name,tileW, tileH, output_path=""):
+def export_transitions(image, layer_name, tileW, tileH, output_path=""):
     for l in image.layers:
         if l.name.startswith(layer_name):
-            #print("exporting layer : " + layer_name)
             export_transition(output_path, image, l, "lle", export_type, get_lle_selection(tileW, tileH))
             export_transition(output_path, image, l, "le",  export_type, get_le_selection(tileW, tileH))
             export_transition(output_path, image, l, "ule", export_type, get_ule_selection(tileW, tileH))
@@ -111,12 +115,20 @@ def translate_selection(sel,dx,dy):
             sel[index] += dx
         else:
             sel[index] += dy
-
 ###########################################################
 #
 #
 ###########################################################
-def get_slice(img, layer, tileName, sliceType, tileW, tileH, grow, translate):
+def get_layer(image,name):
+    for l in image.layers:
+        if l.name == name:
+            return l
+    return None
+###########################################################
+#
+#
+###########################################################
+def get_slice(img, tileName, sliceType, tileW, tileH, grow, translate):
     dx=int(tileW/2*0.8)
     dy=int(tileH/2*0.8)
     sel = eval("get_" + tileName+ "_selection(tileW, tileH)")
@@ -143,54 +155,54 @@ def get_slice(img, layer, tileName, sliceType, tileW, tileH, grow, translate):
 #
 #
 ###########################################################
-def make_seamless_corner(img, layer, cornerType, tileW, tileH, dictionary):
+def make_seamless_corner(img, sourceLayer, destLayer, cornerType, tileW, tileH, dictionary):
     edges = dictionary[cornerType][0]
     sliceType = dictionary[cornerType][1]
 
     #Hide the tile where the corner is supposed to be created
-    select_transition(img, layer, cornerType, tileW, tileH)
-    pdb.gimp_edit_cut(layer)
+    select_transition(img, destLayer, cornerType, tileW, tileH)
+    pdb.gimp_edit_cut(destLayer)
 
     for index in range(len(edges)):
         #select and copy slice
-        get_slice(img, layer, edges[index], sliceType[index], tileW, tileH, 0, 0)
-        pdb.gimp_edit_copy(layer)
+        get_slice(img, edges[index], sliceType[index], tileW, tileH, 0, 0)
+        pdb.gimp_edit_copy(sourceLayer)
         #select and paste slice
-        get_slice(img, layer,cornerType, sliceType[index], tileW, tileH, 0, 1)
-        selId= pdb.gimp_edit_paste(layer, True)
+        get_slice(img, cornerType, sliceType[index], tileW, tileH, 0, 1)
+        selId= pdb.gimp_edit_paste(destLayer, True)
         pdb.gimp_floating_sel_anchor(selId)
         
 ###########################################################
 #
 #
 ###########################################################    
-def make_outside_corners(img, layer, tileW, tileH):
+def make_outside_corners(img, sourceLayer, destLayer, tileW, tileH):
     dictionary = {
         "lle" : ( ["le","de"], ["ne","se"] ),
         "ule" : ( ["le","ue"], ["sw","se"] ),
         "ure" : ( ["ue","re"], ["nw","sw"] ),
         "lre" : ( ["re","de"], ["ne","nw"] )
     }
-    make_seamless_corner(img, layer, "lle", tileW, tileH, dictionary)
-    make_seamless_corner(img, layer, "ule", tileW, tileH, dictionary)
-    make_seamless_corner(img, layer, "ure", tileW, tileH, dictionary)
-    make_seamless_corner(img, layer, "lre", tileW, tileH, dictionary)
+    make_seamless_corner(img, sourceLayer, destLayer, "lle", tileW, tileH, dictionary)
+    make_seamless_corner(img, sourceLayer, destLayer, "ule", tileW, tileH, dictionary)
+    make_seamless_corner(img, sourceLayer, destLayer, "ure", tileW, tileH, dictionary)
+    make_seamless_corner(img, sourceLayer, destLayer, "lre", tileW, tileH, dictionary)
 
 ###########################################################
 #
 #
 ###########################################################    
-def make_inside_corners(img, layer, tileW, tileH):
+def make_inside_corners(img, sourceLayer, destLayer, tileW, tileH):
     dictionary = {
-        "lle" : ( ["le","de"], ["ne","se"] ),
-        "ule" : ( ["le","ue"], ["sw","se"] ),
-        "ure" : ( ["ue","re"], ["nw","sw"] ),
-        "lre" : ( ["re","de"], ["ne","nw"] )
+        "ic_n" : ( ["ue","le"], ["nw","ne"] ),
+        "ic_s" : ( ["re","de"], ["sw","se"] ),
+        "ic_e" : ( ["re","ue"], ["ne","se"] ),
+        "ic_w" : ( ["de","le"], ["nw","sw"] )
     }
-    make_seamless_corner(img, layer, "lle", tileW, tileH, dictionary)
-    make_seamless_corner(img, layer, "ule", tileW, tileH, dictionary)
-    make_seamless_corner(img, layer, "ure", tileW, tileH, dictionary)
-    make_seamless_corner(img, layer, "lre", tileW, tileH, dictionary)
+    make_seamless_corner(img, sourceLayer, destLayer, "ic_n", tileW, tileH, dictionary)
+    make_seamless_corner(img, sourceLayer, destLayer, "ic_s", tileW, tileH, dictionary)
+    make_seamless_corner(img, sourceLayer, destLayer, "ic_e", tileW, tileH, dictionary)
+    make_seamless_corner(img, sourceLayer, destLayer, "ic_w", tileW, tileH, dictionary)
     
 ###########################################################
 #
@@ -234,8 +246,10 @@ def make_seamless(img, layer, tileW, tileH):
     pdb.gimp_image_merge_down(img, l3, 2)
     pdb.gimp_image_merge_down(img, l2, 2)
     layer=pdb.gimp_image_merge_down(img, l1, 2)
-    make_outside_corners(img,layer,tileW,tileH)
-    #make_inside_corners(img,layer,tileW,tileH)
+    
+    make_outside_corners(img,layer,layer,tileW,tileH)
+    insideCornersLayer = get_layer(img,inside_corners_layer)
+    make_inside_corners(img,layer,insideCornersLayer,tileW,tileH)
 
 ###########################################################
 #
@@ -261,13 +275,13 @@ def make_transitions_from_base_tile(img, layer, tileW, tileH):
     make_tile(img, transitions_prefix + "ule", tileW, 0)
     merge_transitions(img, transitions_prefix, transitions_layer)
     #inside corner nw
-    make_tile(img, transitions_prefix + "ic-n", tileW/2, 0)
+    make_tile(img, transitions_prefix + "ic_n", tileW/2, 0)
     #inside corner ne
-    make_tile(img, transitions_prefix + "ic-s", tileW/2, tileH)
+    make_tile(img, transitions_prefix + "ic_s", tileW/2, tileH)
     #inside corner sw
-    make_tile(img, transitions_prefix + "ic-e", tileW, tileH/2)
+    make_tile(img, transitions_prefix + "ic_e", tileW, tileH/2)
     #inside corner se
-    make_tile(img, transitions_prefix + "ic-w", 0, tileH/2)
+    make_tile(img, transitions_prefix + "ic_w", 0, tileH/2)
     merge_transitions(img, transitions_prefix, inside_corners_layer)
 
 ###########################################################
