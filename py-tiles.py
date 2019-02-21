@@ -76,7 +76,7 @@ class Export:
     def export_transition(output_path, img, layer, name, ext, selection):
         img.active_layer = layer
         pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(selection),selection)
-        pdb.gimp_selection_grow(img,0)
+        pdb.gimp_selection_grow(img,1)
         pdb.gimp_edit_copy(layer)
         fsel = pdb.gimp_edit_paste(layer, False)
         new = pdb.gimp_floating_sel_to_layer(fsel)
@@ -200,14 +200,15 @@ class Tiles:
         pdb.gimp_floating_sel_to_layer(bottom_half)
 
         if dir == "tldr":
-            pdb.gimp_drawable_offset(top_half, False, 1, tileW/4, tileH/4)
-            pdb.gimp_drawable_offset(bottom_half, False, 1, -tileW/4, -tileH/4)
+            pdb.gimp_drawable_offset(top_half, False, 1, 1+tileW/4, 1+tileH/4)
+            pdb.gimp_drawable_offset(bottom_half, False, 1, -1-tileW/4, -1-tileH/4)
         else:
-            pdb.gimp_drawable_offset(top_half, False, 1, -tileW/4, tileH/4)
-            pdb.gimp_drawable_offset(bottom_half, False, 1, tileW/4, -tileH/4)
+            pdb.gimp_drawable_offset(top_half, False, 1, -1-tileW/4, 1+tileH/4)
+            pdb.gimp_drawable_offset(bottom_half, False, 1, 1+tileW/4, -1-tileH/4)
 
         combined_layer = pdb.gimp_image_merge_down(img, top_half, 2)
         pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
+        pdb.gimp_selection_grow(img,1)
         pdb.gimp_selection_invert(img)
         pdb.gimp_edit_cut(combined_layer)
         return combined_layer
