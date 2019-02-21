@@ -26,272 +26,266 @@ def get_ic_n_selection(tileW, tileH): return [tileW/2, tileH/2, tileW, 0, tileW/
 def get_ic_s_selection(tileW, tileH): return [tileW/2, tileH/2+tileH, tileW, tileH, tileW+tileW/2, tileH+tileH/2, tileW, 2*tileH]
 def get_ic_e_selection(tileW, tileH): return [tileW, tileH, tileW+tileW/2, tileH/2, 2*tileW, tileH, tileW+tileW/2, tileH+tileH/2]
 def get_ic_w_selection(tileW, tileH): return [0, tileH, tileW/2, tileH/2, tileW, tileH, tileW/2, tileH + tileH/2]
+    
+###########################################################
+#
+#
+###########################################################
+class Util:
 
-###########################################################
-#
-#
-###########################################################
-def export_transitions(image, layer_name, tileW, tileH, output_path=""):
-    for l in image.layers:
-        if l.name.startswith(layer_name):
-            export_transition(output_path, image, l, "lle", export_type, get_lle_selection(tileW, tileH))
-            export_transition(output_path, image, l, "le",  export_type, get_le_selection(tileW, tileH))
-            export_transition(output_path, image, l, "ule", export_type, get_ule_selection(tileW, tileH))
-            export_transition(output_path, image, l, "ue",  export_type, get_ue_selection(tileW, tileH))
-            export_transition(output_path, image, l, "ure", export_type, get_ure_selection(tileW, tileH))
-            export_transition(output_path, image, l, "re",  export_type, get_re_selection(tileW, tileH))
-            export_transition(output_path, image, l, "lre", export_type, get_lre_selection(tileW, tileH))
-            export_transition(output_path, image, l, "de", export_type, get_de_selection(tileW, tileH))
+    @staticmethod
+    def get_layer(image,name):
+            for l in image.layers:
+                if l.name == name:
+                    return l
+            return None
 
-###########################################################
-#
-#
-###########################################################
-def export_transition(output_path, img, layer, name, ext, selection):
-    img.active_layer = layer
-    pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(selection),selection)
-    pdb.gimp_selection_grow(img,1)
-    pdb.gimp_edit_copy(layer)
-    fsel = pdb.gimp_edit_paste(layer, False)
-    new = pdb.gimp_floating_sel_to_layer(fsel)
-    theNewLayer = img.active_layer
-    export_layers(img, theNewLayer, output_path, name, ext)
-    img.remove_layer(theNewLayer)
-    img.active_layer = layer
+    @staticmethod
+    def merge_layers(img, layer_list):
+        if len(layer_list)>0:
+            img.active_layer = layer_list[0]
+            last_layer = None
+            for index in range(len(layer_list)):
+                if index < len(layer_list)-1:
+                    l = layer_list[index]
+                    last_layer = pdb.gimp_image_merge_down(img, l, 0)
+                    layer_list[index+1]=last_layer
+            return last_layer
+        return None
 
-###########################################################
-#
-#
-###########################################################
-def export_layers(imgInput, drw, path, name, ext):
-    img = pdb.gimp_image_duplicate(imgInput)
-
-    for layer in img.layers:
-        layer.visible = False
-
-    for idx, layer in enumerate(img.layers):
-        layer.visible = True
-        filename = name % [ idx, layer.name ]
-        fullpath = os.path.join(path, filename) + ext
-
-        layer_img = img.duplicate()
-        layer_img.flatten()
-        pdb.gimp_file_save(layer_img, drw, fullpath, filename)
-        img.remove_layer(layer)
-        pdb.gimp_image_delete(layer_img)
-    pdb.gimp_image_delete(img)
-
-###########################################################
-#
-#
-###########################################################
-def make_tile(img, name, x , y):
-    base = next(x for x in img.layers if x.name == baseLayerName )
-    layer = base.copy()
-    layer.name = name
-    layer.set_offsets(x, y)
-    img.add_layer(layer, 0)
-
-###########################################################
-#
-#
-###########################################################
-def merge_transitions(img, withPrefix, destLayer):
-    for l in img.layers:
-        if l.name.startswith(withPrefix):
-            pdb.gimp_drawable_set_visible(l, True)
-        else:
-            pdb.gimp_drawable_set_visible(l, False)
-    allTrans = pdb.gimp_image_merge_visible_layers(img, 0)
-    allTrans.name = destLayer
-
-###########################################################
-#
-#
-###########################################################
-def translate_selection(sel,dx,dy):
-    for index in range(len(sel)):
-        if index%2==0:
-            sel[index] += dx
-        else:
-            sel[index] += dy
-###########################################################
-#
-#
-###########################################################
-def get_layer(image,name):
-    for l in image.layers:
-        if l.name == name:
-            return l
-    return None
-###########################################################
-#
-#
-###########################################################
-def get_slice(img, tileName, sliceType, tileW, tileH, grow, translate):
-    dx=int(tileW/2*0.8)
-    dy=int(tileH/2*0.8)
-    sel = eval("get_" + tileName+ "_selection(tileW, tileH)")
-    if sliceType == "nw":
-        sel[4] -= dx; sel[6] -= dx
-        sel[5] -= dy; sel[7] -= dy
-        translate_selection(sel,-translate,-translate)
-    if sliceType == "ne":
-        sel[0] += dx; sel[6] += dx
-        sel[1] -= dy; sel[7] -= dy
-        translate_selection(sel,translate,-translate)
-    if sliceType == "sw":
-        sel[2] -= dx; sel[4] -= dx
-        sel[3] += dy; sel[5] += dy
-        translate_selection(sel,-translate,translate)
-    if sliceType == "se":
-        sel[0] += dx; sel[2] += dx
-        sel[1] += dy; sel[3] += dy
-        translate_selection(sel,translate,translate)
-    pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
-    pdb.gimp_selection_grow(img,grow)
-
-###########################################################
-#
-#
-###########################################################
-def make_seamless_corner(img, sourceLayer, destLayer, cornerType, tileW, tileH, dictionary):
-    edges = dictionary[cornerType][0]
-    sliceType = dictionary[cornerType][1]
-
-    #Hide the tile where the corner is supposed to be created
-    select_transition(img, destLayer, cornerType, tileW, tileH)
-    pdb.gimp_edit_cut(destLayer)
-
-    for index in range(len(edges)):
-        #select and copy slice
-        get_slice(img, edges[index], sliceType[index], tileW, tileH, 0, 0)
-        pdb.gimp_edit_copy(sourceLayer)
-        #select and paste slice
-        get_slice(img, cornerType, sliceType[index], tileW, tileH, 0, 1)
-        selId= pdb.gimp_edit_paste(destLayer, True)
-        pdb.gimp_floating_sel_anchor(selId)
+class Export:
         
 ###########################################################
 #
 #
-###########################################################    
-def make_outside_corners(img, sourceLayer, destLayer, tileW, tileH):
-    dictionary = {
-        "lle" : ( ["le","de"], ["ne","se"] ),
-        "ule" : ( ["le","ue"], ["sw","se"] ),
-        "ure" : ( ["ue","re"], ["nw","sw"] ),
-        "lre" : ( ["re","de"], ["ne","nw"] )
-    }
-    make_seamless_corner(img, sourceLayer, destLayer, "lle", tileW, tileH, dictionary)
-    make_seamless_corner(img, sourceLayer, destLayer, "ule", tileW, tileH, dictionary)
-    make_seamless_corner(img, sourceLayer, destLayer, "ure", tileW, tileH, dictionary)
-    make_seamless_corner(img, sourceLayer, destLayer, "lre", tileW, tileH, dictionary)
-
 ###########################################################
-#
-#
-###########################################################    
-def make_inside_corners(img, sourceLayer, destLayer, tileW, tileH):
-    dictionary = {
-        "ic_n" : ( ["ue","le"], ["nw","ne"] ),
-        "ic_s" : ( ["re","de"], ["sw","se"] ),
-        "ic_e" : ( ["re","ue"], ["ne","se"] ),
-        "ic_w" : ( ["de","le"], ["nw","sw"] )
-    }
-    make_seamless_corner(img, sourceLayer, destLayer, "ic_n", tileW, tileH, dictionary)
-    make_seamless_corner(img, sourceLayer, destLayer, "ic_s", tileW, tileH, dictionary)
-    make_seamless_corner(img, sourceLayer, destLayer, "ic_e", tileW, tileH, dictionary)
-    make_seamless_corner(img, sourceLayer, destLayer, "ic_w", tileW, tileH, dictionary)
-    
-###########################################################
-#
-#
-###########################################################
-def make_seamless_internal(img, layer, tileName, tileW, tileH, dir):
-    sel = eval("get_" + tileName+ "_selection(tileW, tileH)")
-    pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
-    #pdb.gimp_selection_grow(img,0)
-    pdb.gimp_edit_copy(layer)
-    
-    top_half = pdb.gimp_edit_paste(layer, False)
-    pdb.gimp_floating_sel_to_layer(top_half)
-    pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
-    bottom_half = pdb.gimp_edit_paste(layer, False)
-    pdb.gimp_floating_sel_to_layer(bottom_half)
+    @staticmethod
+    def export_transitions(image, layer_name, tileW, tileH, output_path=""):
+        for l in image.layers:
+            if l.name.startswith(layer_name):
+                Export.export_transition(output_path, image, l, "lle", export_type, get_lle_selection(tileW, tileH))
+                Export.export_transition(output_path, image, l, "le",  export_type, get_le_selection(tileW, tileH))
+                Export.export_transition(output_path, image, l, "ule", export_type, get_ule_selection(tileW, tileH))
+                Export.export_transition(output_path, image, l, "ue",  export_type, get_ue_selection(tileW, tileH))
+                Export.export_transition(output_path, image, l, "ure", export_type, get_ure_selection(tileW, tileH))
+                Export.export_transition(output_path, image, l, "re",  export_type, get_re_selection(tileW, tileH))
+                Export.export_transition(output_path, image, l, "lre", export_type, get_lre_selection(tileW, tileH))
+                Export.export_transition(output_path, image, l, "de", export_type, get_de_selection(tileW, tileH))
 
-    if dir == "tldr":
-        pdb.gimp_drawable_offset(top_half, False, 1, tileW/4, tileH/4)
-        pdb.gimp_drawable_offset(bottom_half, False, 1, -tileW/4, -tileH/4)
-    else:
-        pdb.gimp_drawable_offset(top_half, False, 1, -tileW/4, tileH/4)
-        pdb.gimp_drawable_offset(bottom_half, False, 1, tileW/4, -tileH/4)
+    @staticmethod            
+    def export_transition(output_path, img, layer, name, ext, selection):
+        img.active_layer = layer
+        pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(selection),selection)
+        pdb.gimp_selection_grow(img,0)
+        pdb.gimp_edit_copy(layer)
+        fsel = pdb.gimp_edit_paste(layer, False)
+        new = pdb.gimp_floating_sel_to_layer(fsel)
+        theNewLayer = img.active_layer
+        Export.export_layers(img, theNewLayer, output_path, name, ext)
+        img.remove_layer(theNewLayer)
+        img.active_layer = layer
 
-    combined_layer = pdb.gimp_image_merge_down(img, top_half, 2)
-    pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
-    pdb.gimp_selection_invert(img)
-    pdb.gimp_edit_cut(combined_layer)
-    return combined_layer
+    @staticmethod
+    def export_layers(imgInput, drw, path, name, ext):
+        img = pdb.gimp_image_duplicate(imgInput)
+
+        for layer in img.layers:
+            layer.visible = False
+
+        for idx, layer in enumerate(img.layers):
+            layer.visible = True
+            filename = name % [ idx, layer.name ]
+            fullpath = os.path.join(path, filename) + ext
+
+            layer_img = img.duplicate()
+            layer_img.flatten()
+            pdb.gimp_file_save(layer_img, drw, fullpath, filename)
+            img.remove_layer(layer)
+            pdb.gimp_image_delete(layer_img)
+        pdb.gimp_image_delete(img)
 
 ###########################################################
 #
 #
 ###########################################################
-def make_seamless(img, layer, tileW, tileH):
-    l1=make_seamless_internal(img, layer, "le" , tileW, tileH, "")
-    l2=make_seamless_internal(img, layer, "ue" , tileW, tileH, "tldr")
-    l3=make_seamless_internal(img, layer, "re" , tileW, tileH, "")
-    l4=make_seamless_internal(img, layer, "de" , tileW, tileH, "tldr")
-    pdb.gimp_image_merge_down(img, l4, 2)
-    pdb.gimp_image_merge_down(img, l3, 2)
-    pdb.gimp_image_merge_down(img, l2, 2)
-    layer=pdb.gimp_image_merge_down(img, l1, 2)
-    
-    make_outside_corners(img,layer,layer,tileW,tileH)
-    insideCornersLayer = get_layer(img,inside_corners_layer)
-    make_inside_corners(img,layer,insideCornersLayer,tileW,tileH)
+class Tiles:
+
+    @staticmethod
+    def get_slice(img, tileName, sliceType, tileW, tileH):
+        dx=int(tileW/2*0.8)
+        dy=int(tileH/2*0.8)
+        sel = eval("get_" + tileName+ "_selection(tileW, tileH)")
+        if sliceType == "nw":
+            sel[4] -= dx; sel[6] -= dx
+            sel[5] -= dy; sel[7] -= dy
+        if sliceType == "ne":
+            sel[0] += dx; sel[6] += dx
+            sel[1] -= dy; sel[7] -= dy
+        if sliceType == "sw":
+            sel[2] -= dx; sel[4] -= dx
+            sel[3] += dy; sel[5] += dy
+        if sliceType == "se":
+            sel[0] += dx; sel[2] += dx
+            sel[1] += dy; sel[3] += dy
+        return sel
+
+    @staticmethod
+    def make_seamless_corner(img, sourceLayer, destLayer, cornerType, tileW, tileH, dictionary):
+        edges = dictionary[cornerType][0]
+        sliceType = dictionary[cornerType][1]
+        corner_layers = []
+
+        #Hide the tile where the corner is supposed to be created
+        Transitions.select_transition(img, destLayer, cornerType, tileW, tileH)
+
+        for index in range(len(edges)):
+            #select and copy slice
+            ss = Tiles.get_slice(img, edges[index], sliceType[index], tileW, tileH)
+            pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(ss),ss)
+            pdb.gimp_edit_copy(sourceLayer)
+
+            #paste slice
+            selId= pdb.gimp_edit_paste(destLayer, False)
+            pdb.gimp_floating_sel_to_layer(selId)
+            pos = pdb.gimp_drawable_offsets(selId)
+            #move it 
+            ds = Tiles.get_slice(img, cornerType, sliceType[index], tileW, tileH)
+            pdb.gimp_layer_set_offsets(selId, pos[0]+(ds[0]-ss[0]), pos[1]+(ds[1]-ss[1]))
+            corner_layers.append(selId)
+
+        layer = Util.merge_layers(img,corner_layers)
+        layer.name = cornerType
+        return layer
+
+    @staticmethod
+    def make_outside_corners(img, sourceLayer, destLayer, tileW, tileH):
+        corners = []
+        dictionary = {
+            "lle" : ( ["le","de"], ["ne","se"] ),
+            "ule" : ( ["le","ue"], ["sw","se"] ),
+            "ure" : ( ["ue","re"], ["nw","sw"] ),
+            "lre" : ( ["re","de"], ["ne","nw"] )
+        }
+        corners.append(Tiles.make_seamless_corner(img, sourceLayer, destLayer, "lle", tileW, tileH, dictionary))
+        corners.append(Tiles.make_seamless_corner(img, sourceLayer, destLayer, "ule", tileW, tileH, dictionary))
+        corners.append(Tiles.make_seamless_corner(img, sourceLayer, destLayer, "ure", tileW, tileH, dictionary))
+        corners.append(Tiles.make_seamless_corner(img, sourceLayer, destLayer, "lre", tileW, tileH, dictionary))
+        return Util.merge_layers(img,corners)
+
+    @staticmethod
+    def make_inside_corners(img, sourceLayer, destLayer, tileW, tileH):
+        corners = []
+        dictionary = {
+            "ic_n" : ( ["ue","le"], ["nw","ne"] ),
+            "ic_s" : ( ["re","de"], ["sw","se"] ),
+            "ic_e" : ( ["re","ue"], ["ne","se"] ),
+            "ic_w" : ( ["de","le"], ["nw","sw"] )
+        }
+        corners.append(Tiles.make_seamless_corner(img, sourceLayer, destLayer, "ic_n", tileW, tileH, dictionary))
+        corners.append(Tiles.make_seamless_corner(img, sourceLayer, destLayer, "ic_s", tileW, tileH, dictionary))
+        corners.append(Tiles.make_seamless_corner(img, sourceLayer, destLayer, "ic_e", tileW, tileH, dictionary))
+        corners.append(Tiles.make_seamless_corner(img, sourceLayer, destLayer, "ic_w", tileW, tileH, dictionary))
+        return Util.merge_layers(img,corners)
+
+    @staticmethod
+    def make_seamless_internal(img, layer, tileName, tileW, tileH, dir):
+        sel = eval("get_" + tileName+ "_selection(tileW, tileH)")
+        pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
+        pdb.gimp_edit_copy(layer)    
+        top_half = pdb.gimp_edit_paste(layer, True)
+        pdb.gimp_floating_sel_to_layer(top_half)
+        
+        pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
+        bottom_half = pdb.gimp_edit_paste(layer, True)
+        pdb.gimp_floating_sel_to_layer(bottom_half)
+
+        if dir == "tldr":
+            pdb.gimp_drawable_offset(top_half, False, 1, tileW/4, tileH/4)
+            pdb.gimp_drawable_offset(bottom_half, False, 1, -tileW/4, -tileH/4)
+        else:
+            pdb.gimp_drawable_offset(top_half, False, 1, -tileW/4, tileH/4)
+            pdb.gimp_drawable_offset(bottom_half, False, 1, tileW/4, -tileH/4)
+
+        combined_layer = pdb.gimp_image_merge_down(img, top_half, 2)
+        pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
+        pdb.gimp_selection_invert(img)
+        pdb.gimp_edit_cut(combined_layer)
+        return combined_layer
+
+    @staticmethod
+    def make_seamless(img, layer, tileW, tileH):
+        corners = []
+        corners.append(Tiles.make_seamless_internal(img, layer, "le" , tileW, tileH, ""))
+        corners.append(Tiles.make_seamless_internal(img, layer, "ue" , tileW, tileH, "tldr"))
+        corners.append(Tiles.make_seamless_internal(img, layer, "re" , tileW, tileH, ""))
+        corners.append(Tiles.make_seamless_internal(img, layer, "de" , tileW, tileH, "tldr"))
+        dest_layer = Util.merge_layers(img,corners)
+
+        corners = []
+        corners.append(Tiles.make_outside_corners(img,dest_layer,dest_layer,tileW,tileH))
+        insideCornersLayer = Util.get_layer(img,inside_corners_layer)
+        corners.append(Tiles.make_inside_corners(img,dest_layer, insideCornersLayer,tileW,tileH))
+        dest_layer = Util.merge_layers(img,corners)
 
 ###########################################################
 #
 #
 ###########################################################
-def make_transitions_from_base_tile(img, layer, tileW, tileH):
-    img.resize(tileW*3, tileH*3,tileW, tileH)
-    #left corner
-    make_tile(img, transitions_prefix + "lle", 0, tileH)
-    #right corner
-    make_tile(img, transitions_prefix + "ure", 2*tileW, tileH)
-    #up edge
-    make_tile(img, transitions_prefix + "ue", tileW+tileW/2, tileH/2)
-    #right edge
-    make_tile(img, transitions_prefix + "re", tileW+tileW/2, tileH + tileH/2)
-    #left edge
-    make_tile(img, transitions_prefix + "le", tileW/2, tileH/2)
-    #down edge
-    make_tile(img, transitions_prefix + "de", tileW/2, tileH + tileH/2)
-    #lower right corner
-    make_tile(img, transitions_prefix + "lre", tileW, 2 * tileH)
-    #upper left corner
-    make_tile(img, transitions_prefix + "ule", tileW, 0)
-    merge_transitions(img, transitions_prefix, transitions_layer)
-    #inside corner nw
-    make_tile(img, transitions_prefix + "ic_n", tileW/2, 0)
-    #inside corner ne
-    make_tile(img, transitions_prefix + "ic_s", tileW/2, tileH)
-    #inside corner sw
-    make_tile(img, transitions_prefix + "ic_e", tileW, tileH/2)
-    #inside corner se
-    make_tile(img, transitions_prefix + "ic_w", 0, tileH/2)
-    merge_transitions(img, transitions_prefix, inside_corners_layer)
+class Transitions:
 
-###########################################################
-#
-#
-###########################################################
-def select_transition(img, layer, tileName, tileW, tileH, grow=0):
-    sel = eval("get_" + tileName+ "_selection(tileW, tileH)")
-    pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
-    pdb.gimp_selection_grow(img,grow)
+    @staticmethod
+    def make_transitions_from_base_tile(img, layer, tileW, tileH):
+        img.resize(tileW*3, tileH*3,tileW, tileH)
+        #left corner
+        Transitions.make_tile(img, transitions_prefix + "lle", 0, tileH)
+        #right corner
+        Transitions.make_tile(img, transitions_prefix + "ure", 2*tileW, tileH)
+        #up edge
+        Transitions.make_tile(img, transitions_prefix + "ue", tileW+tileW/2, tileH/2)
+        #right edge
+        Transitions.make_tile(img, transitions_prefix + "re", tileW+tileW/2, tileH + tileH/2)
+        #left edge
+        Transitions.make_tile(img, transitions_prefix + "le", tileW/2, tileH/2)
+        #down edge
+        Transitions.make_tile(img, transitions_prefix + "de", tileW/2, tileH + tileH/2)
+        #lower right corner
+        Transitions.make_tile(img, transitions_prefix + "lre", tileW, 2 * tileH)
+        #upper left corner
+        Transitions.make_tile(img, transitions_prefix + "ule", tileW, 0)
+        Transitions.merge_transitions(img, transitions_prefix, transitions_layer)
+        #inside corner nw
+        Transitions.make_tile(img, transitions_prefix + "ic_n", tileW/2, 0)
+        #inside corner ne
+        Transitions.make_tile(img, transitions_prefix + "ic_s", tileW/2, tileH)
+        #inside corner sw
+        Transitions.make_tile(img, transitions_prefix + "ic_e", tileW, tileH/2)
+        #inside corner se
+        Transitions.make_tile(img, transitions_prefix + "ic_w", 0, tileH/2)
+        Transitions.merge_transitions(img, transitions_prefix, inside_corners_layer)
+
+    @staticmethod
+    def make_tile(img, name, x , y):
+        base = next(x for x in img.layers if x.name == baseLayerName )
+        layer = base.copy()
+        layer.name = name
+        layer.set_offsets(x, y)
+        img.add_layer(layer, 0)
+
+    @staticmethod
+    def merge_transitions(img, withPrefix, destLayer):
+        for l in img.layers:
+            if l.name.startswith(withPrefix):
+                pdb.gimp_drawable_set_visible(l, True)
+            else:
+                pdb.gimp_drawable_set_visible(l, False)
+        allTrans = pdb.gimp_image_merge_visible_layers(img, 0)
+        allTrans.name = destLayer
+
+    @staticmethod       
+    def select_transition(img, layer, tileName, tileW, tileH, grow=0):
+        sel = eval("get_" + tileName+ "_selection(tileW, tileH)")
+        pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
+        pdb.gimp_selection_grow(img,grow)
 
 ###########################################################
 #image= gimp.image_list()[0]
@@ -314,7 +308,7 @@ register(
           (PF_INT, "tileH", "Tile Height", 64)
           ],
          [],
-         select_transition,
+         Transitions.select_transition,
          menu="<Image>/Filters/Alex's/Tile Library",
          domain=("gimp20-python", gimp.locale_directory))
 
@@ -334,7 +328,7 @@ register(
           (PF_INT, "tileH", "Tile Height", 64)
           ],
          [],
-         make_transitions_from_base_tile,
+         Transitions.make_transitions_from_base_tile,
          menu="<Image>/Filters/Alex's/Tile Library",
          domain=("gimp20-python", gimp.locale_directory))
 
@@ -354,7 +348,7 @@ register(
           (PF_INT, "tileH", "Tile Height", 64)
           ],
          [],
-         make_seamless,
+         Tiles.make_seamless,
          menu="<Image>/Filters/Alex's/Tile Library",
          domain=("gimp20-python", gimp.locale_directory))
 
@@ -375,7 +369,7 @@ register(
             (PF_DIRNAME, "output_path", _("Output Path"), os.getcwd())
          ],
          [],
-         export_transitions,
+         Export.export_transitions,
          menu="<Image>/Filters/Alex's/Tile Library",
          domain=("gimp20-python", gimp.locale_directory))
 
