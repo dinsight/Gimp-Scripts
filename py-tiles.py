@@ -13,7 +13,9 @@ baseLayerName = "base"
 transitions_prefix = "trans-"
 transitions_layer = "transitions-layer"
 inside_corners_layer = "inside-corners-layer"
-        
+
+def sign(n): return (n > 0) - (n < 0);
+
 def get_lle_selection(tileW, tileH): return [0, tileH + tileH/2, tileW/2, tileH, tileW, tileH + tileH/2, tileW/2, 2* tileH ]
 def get_le_selection(tileW, tileH): return [tileW/2, tileH, tileW, tileH/2, tileW + tileW/2, tileH, tileW, tileH + tileH/2 ]
 def get_ule_selection(tileW, tileH): return [tileW, tileH/2, tileW + tileW/2, 0, 2 * tileW, tileH/2, tileW + tileW/2, tileH]
@@ -80,6 +82,10 @@ class Export:
                 Export.export_transition(output_path, image, l, "re",  export_type, get_re_selection(tileW, tileH))
                 Export.export_transition(output_path, image, l, "lre", export_type, get_lre_selection(tileW, tileH))
                 Export.export_transition(output_path, image, l, "de", export_type, get_de_selection(tileW, tileH))
+                Export.export_transition(output_path, image, l, "ic_n", export_type, get_ic_n_selection(tileW, tileH))
+                Export.export_transition(output_path, image, l, "ic_s", export_type, get_ic_s_selection(tileW, tileH))
+                Export.export_transition(output_path, image, l, "ic_e", export_type, get_ic_e_selection(tileW, tileH))
+                Export.export_transition(output_path, image, l, "ic_w", export_type, get_ic_w_selection(tileW, tileH))
 
     @staticmethod            
     def export_transition(output_path, img, layer, name, ext, selection):
@@ -159,7 +165,14 @@ class Tiles:
             pos = pdb.gimp_drawable_offsets(selId)
             #move it 
             ds = Tiles.get_tile_slice(img, cornerType, sliceType[index], tileW, tileH)
-            pdb.gimp_layer_set_offsets(selId, pos[0]+(ds[0]-ss[0]), pos[1]+(ds[1]-ss[1]))
+
+            pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(ds),ds)
+            pdb.gimp_selection_grow(img,1)
+            pdb.gimp_edit_cut(destLayer)
+            
+            dx = ds[0]-ss[0]
+            dy = ds[1]-ss[1]
+            pdb.gimp_layer_set_offsets(selId, pos[0]+dx, pos[1]+dy)
             corner_layers.append(selId)
 
         layer = Util.merge_layers(img,corner_layers)
@@ -174,7 +187,7 @@ class Tiles:
         top_half = pdb.gimp_edit_paste(layer, True)
         pdb.gimp_floating_sel_to_layer(top_half)
         
-        pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
+        #pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
         bottom_half = pdb.gimp_edit_paste(layer, True)
         pdb.gimp_floating_sel_to_layer(bottom_half)
 
@@ -211,11 +224,12 @@ class Tiles:
     def make_inside_corners(img, sourceLayer, destLayer, tileW, tileH):
         corners = []
         dictionary = {
-            "ic_n" : ( ["ue","le"], ["se","sw"] ),
-            "ic_s" : ( ["re","de"], ["nw","ne"] ),
-            "ic_e" : ( ["re","ue"], ["nw","sw"] ),
-            "ic_w" : ( ["de","le"], ["ne","se"] )
+            "ic_n" : ( ["ue","le"], ["nw","ne"] ),
+            "ic_s" : ( ["re","de"], ["sw","se"] ),
+            "ic_e" : ( ["re","ue"], ["ne","se"] ),
+            "ic_w" : ( ["de","le"], ["nw","sw"] )
         }
+                
         corners.append(Tiles.make_seamless_corner(img, sourceLayer, destLayer, "ic_n", tileW, tileH, dictionary))
         corners.append(Tiles.make_seamless_corner(img, sourceLayer, destLayer, "ic_s", tileW, tileH, dictionary))
         corners.append(Tiles.make_seamless_corner(img, sourceLayer, destLayer, "ic_e", tileW, tileH, dictionary))
@@ -231,18 +245,30 @@ class Tiles:
         corners.append(Tiles.make_seamless_tile(img, layer, "de" , tileW, tileH, "tldr"))
         dest_layer = Util.merge_layers(img,corners)
         pdb.gimp_layer_resize_to_image_size(dest_layer)
-        
-        #corners = []
-        #corners.append(Tiles.make_outside_corners(img,dest_layer,dest_layer,tileW,tileH))
-        #insideCornersLayer = Util.get_layer(img,inside_corners_layer)
-        inside_corners = Tiles.make_outside_corners(img,dest_layer,dest_layer,tileW,tileH)
-        pdb.gimp_layer_resize_to_image_size(inside_corners)
-        
-        #corners.append(Tiles.make_inside_corners(img,dest_layer, insideCornersLayer,tileW,tileH))
-        #dest_layer = Util.merge_layers(img,corners)
-        outside_corners = Tiles.make_inside_corners(img,dest_layer, dest_layer,tileW,tileH)
-        #pdb.gimp_layer_resize_to_image_size(outside_corners)
+        '''
+        outside_corners = Tiles.make_outside_corners(img,dest_layer,dest_layer,tileW,tileH)
+        pdb.gimp_layer_resize_to_image_size(outside_corners)
+        dest_layer = Util.merge_layers(img,[outside_corners, dest_layer])
+        img.active_layer = dest_layer
+        '''
 
+    @staticmethod
+    def make_seamless_inside_corners(img, layer, tileW, tileH):
+        icn = Transitions.make_tile(img, transitions_prefix + "ic_n", 2*tileW+tileW/2, 2*tileH+tileH/2)
+        ics = Transitions.make_tile(img, transitions_prefix + "ic_s", 2*tileW+tileW/2, 3*tileH+tileH/2)
+        ice = Transitions.make_tile(img, transitions_prefix + "ic_e", 3*tileW, 3*tileH)
+        icw = Transitions.make_tile(img, transitions_prefix + "ic_w", 2*tileW, 3*tileH)
+        #Transitions.merge_transitions(img, transitions_prefix, transitions_layer)
+        pdb.gimp_drawable_set_visible(icn, True)
+        pdb.gimp_drawable_set_visible(ics, True)
+        pdb.gimp_drawable_set_visible(ice, True)
+        pdb.gimp_drawable_set_visible(icw, True)
+        Util.merge_layers(img,[icw, ice, ics, icn, layer])
+        
+        work_layer = img.active_layer
+        inside_corners = Tiles.make_inside_corners(img,work_layer, work_layer,tileW,tileH)
+        dest_layer = Util.merge_layers(img,[inside_corners, work_layer])
+        
 ###########################################################
 #
 #
@@ -268,15 +294,7 @@ class Transitions:
         Transitions.make_tile(img, transitions_prefix + "lre", tileW, 2 * tileH)
         #upper left corner
         Transitions.make_tile(img, transitions_prefix + "ule", tileW, 0)
-        #inside corner nw
-        Transitions.make_tile(img, transitions_prefix + "ic_n", 2*tileW+tileW/2, 2*tileH+tileH/2)
-        #inside corner ne
-        Transitions.make_tile(img, transitions_prefix + "ic_s", 2*tileW+tileW/2, 3*tileH+tileH/2)
-        #inside corner sw
-        Transitions.make_tile(img, transitions_prefix + "ic_e", 3*tileW, 3*tileH)
-        #inside corner se
-        Transitions.make_tile(img, transitions_prefix + "ic_w", 2*tileW, 3*tileH)
-        Transitions.merge_transitions(img, transitions_prefix, transitions_layer)
+        Transitions.merge_transitions(img, transitions_prefix, transitions_layer)        
 
     @staticmethod
     def make_tile(img, name, x , y):
@@ -285,6 +303,7 @@ class Transitions:
         layer.name = name
         layer.set_offsets(x, y)
         img.add_layer(layer, 0)
+        return layer
 
     @staticmethod
     def merge_transitions(img, withPrefix, destLayer):
@@ -349,7 +368,7 @@ register(
          domain=("gimp20-python", gimp.locale_directory))
 
 register(
-         "python_fu_make_seamlesss",
+         "python_fu_make_seamless",
          N_("Make Seamless Transitions"),
          """Make Seamless Transitions""",
          "Alex Cotoman",
@@ -369,13 +388,33 @@ register(
          domain=("gimp20-python", gimp.locale_directory))
 
 register(
+         "python_fu_make_seamless_inside_corners",
+         N_("Make Seamless Inside Corners"),
+         """Make Seamless Inside Corners""",
+         "Alex Cotoman",
+         "Alex Cotoman",
+         "2019",
+         _("_3. Make Seamless Inside Corners..."),
+         "*",
+         [
+          (PF_IMAGE, "image", "Input image", None),
+          (PF_DRAWABLE, "layer", "Input layer", None),
+          (PF_INT, "tileW", "Tile Width", 128),
+          (PF_INT, "tileH", "Tile Height", 64)
+          ],
+         [],
+         Tiles.make_seamless_inside_corners,
+         menu="<Image>/Filters/Alex's/Tile Library",
+         domain=("gimp20-python", gimp.locale_directory))
+
+register(
          "python_fu_export_transitions",
          N_("Export Tile Transitions"),
          """Export Tile Transitions""",
          "Alex Cotoman",
          "Alex Cotoman",
          "2019",
-         _("_3. Export Transitions..."),
+         _("_4. Export Transitions..."),
          "*",
          [
             (PF_IMAGE, "image", "Input image", None),
