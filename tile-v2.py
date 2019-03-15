@@ -152,11 +152,13 @@ class Tiles:
 
         #Hide the tile where the corner is supposed to be created
         Transitions.select_transition(img, destLayer, cornerType, tileW, tileH)
+        #pdb.gimp_selection_sharpen(img)
 
         for index in range(len(edges)):
             #select and copy slice
             ss = Tiles.get_tile_slice(img, edges[index], sliceType[index], tileW, tileH)
             pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(ss),ss)
+            pdb.gimp_selection_sharpen(img)
             pdb.gimp_edit_copy(sourceLayer)
 
             #paste slice
@@ -167,11 +169,19 @@ class Tiles:
             ds = Tiles.get_tile_slice(img, cornerType, sliceType[index], tileW, tileH)
 
             pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(ds),ds)
-            pdb.gimp_selection_grow(img,1)
+            pdb.gimp_selection_sharpen(img)
+            #pdb.gimp_selection_grow(img,1)
             pdb.gimp_edit_cut(destLayer)
             
             dx = ds[0]-ss[0]
             dy = ds[1]-ss[1]
+            if sliceType[index] == "sw":
+                dx -= 1
+                dy += 1
+            if sliceType[index] == "se":
+                dx += 1
+                dy += 1
+            
             pdb.gimp_layer_set_offsets(selId, pos[0]+dx, pos[1]+dy)
             corner_layers.append(selId)
 
@@ -183,6 +193,7 @@ class Tiles:
     def make_seamless_tile(img, layer, tileName, tileW, tileH, dir):
         sel = eval("get_" + tileName+ "_selection(tileW, tileH)")
         pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
+        pdb.gimp_selection_sharpen(img)
         pdb.gimp_edit_copy(layer)    
         top_half = pdb.gimp_edit_paste(layer, True)
         pdb.gimp_floating_sel_to_layer(top_half)
@@ -192,15 +203,15 @@ class Tiles:
         pdb.gimp_floating_sel_to_layer(bottom_half)
 
         if dir == "tldr":
-            pdb.gimp_drawable_offset(top_half, False, 1, 1+tileW/4, 1+tileH/4)
+            pdb.gimp_drawable_offset(top_half, False, 1, +tileW/4, +tileH/4)
             pdb.gimp_drawable_offset(bottom_half, False, 1, -tileW/4, -tileH/4)
         else:
-            pdb.gimp_drawable_offset(top_half, False, 1, 1-tileW/4, -1+tileH/4)
+            pdb.gimp_drawable_offset(top_half, False, 1, -tileW/4, +tileH/4)
             pdb.gimp_drawable_offset(bottom_half, False, 1, tileW/4, -tileH/4)
 
         combined_layer = pdb.gimp_image_merge_down(img, top_half, 2)
         pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
-        #pdb.gimp_selection_grow(img,1)
+        pdb.gimp_selection_sharpen(img)
         pdb.gimp_selection_invert(img)
         pdb.gimp_edit_cut(combined_layer)
         return combined_layer
@@ -273,8 +284,14 @@ class Tiles:
     def make_seamless_test(img, layer, tileW, tileH):
         corners = []
         corners.append(Tiles.make_seamless_tile(img, layer, "le" , tileW, tileH, ""))
-        #dest_layer = Util.merge_layers(img,corners)
-        pdb.gimp_layer_resize_to_image_size(corners[0])
+        corners.append(Tiles.make_seamless_tile(img, layer, "ue" , tileW, tileH, "tldr"))
+        corners.append(Tiles.make_seamless_tile(img, layer, "re" , tileW, tileH, ""))
+        corners.append(Tiles.make_seamless_tile(img, layer, "de" , tileW, tileH, "tldr"))
+        dest_layer = Util.merge_layers(img,corners)
+        pdb.gimp_layer_resize_to_image_size(dest_layer)
+
+        outside_corners = Tiles.make_outside_corners(img,dest_layer,dest_layer,tileW,tileH)
+        pdb.gimp_layer_resize_to_image_size(outside_corners)
         
         
 ###########################################################
