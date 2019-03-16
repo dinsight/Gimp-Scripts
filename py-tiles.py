@@ -28,7 +28,9 @@ def get_ic_n_selection(tileW, tileH): return Util.offset_selection([tileW/2, til
 def get_ic_s_selection(tileW, tileH): return Util.offset_selection([tileW/2, tileH/2+tileH, tileW, tileH, tileW+tileW/2, tileH+tileH/2, tileW, 2*tileH], 2*tileW, 2*tileH+tileH/2)
 def get_ic_e_selection(tileW, tileH): return Util.offset_selection([tileW, tileH, tileW+tileW/2, tileH/2, 2*tileW, tileH, tileW+tileW/2, tileH+tileH/2], 2*tileW, 2*tileH+tileH/2)
 def get_ic_w_selection(tileW, tileH): return Util.offset_selection([0, tileH, tileW/2, tileH/2, tileW, tileH, tileW/2, tileH + tileH/2], 2*tileW, 2*tileH+tileH/2)
-    
+
+def get_ic_selection(tileW, tileH): return Util.offset_selection([tileW/2, tileH/2, tileW, tileH,2*tileW, tileH, tileW/2, tileH + tileH/2], 2*tileW, 2*tileH+tileH/2)
+
 ###########################################################
 #
 #
@@ -166,9 +168,9 @@ class Tiles:
             #move it 
             ds = Tiles.get_tile_slice(img, cornerType, sliceType[index], tileW, tileH)
 
-            pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(ds),ds)
-            pdb.gimp_selection_grow(img,1)
-            pdb.gimp_edit_cut(destLayer)
+            #pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(ds),ds)
+            #pdb.gimp_selection_grow(img,1)
+            #pdb.gimp_edit_cut(destLayer)
             
             dx = ds[0]-ss[0]
             dy = ds[1]-ss[1]
@@ -183,7 +185,9 @@ class Tiles:
     def make_seamless_tile(img, layer, tileName, tileW, tileH, dir):
         sel = eval("get_" + tileName+ "_selection(tileW, tileH)")
         pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
-        pdb.gimp_edit_copy(layer)    
+        pdb.gimp_selection_grow(img,1)
+        
+        pdb.gimp_edit_cut(layer)    
         top_half = pdb.gimp_edit_paste(layer, True)
         pdb.gimp_floating_sel_to_layer(top_half)
         
@@ -193,14 +197,16 @@ class Tiles:
 
         if dir == "tldr":
             pdb.gimp_drawable_offset(top_half, False, 1, 1+tileW/4, 1+tileH/4)
-            pdb.gimp_drawable_offset(bottom_half, False, 1, -1-tileW/4, -1-tileH/4)
+            pdb.gimp_drawable_offset(bottom_half, False, 1, -tileW/4, -tileH/4)
         else:
-            pdb.gimp_drawable_offset(top_half, False, 1, -1-tileW/4, 1+tileH/4)
-            pdb.gimp_drawable_offset(bottom_half, False, 1, 1+tileW/4, -1-tileH/4)
+            pdb.gimp_drawable_offset(top_half, False, 1, -tileW/4, tileH/4)
+            pdb.gimp_drawable_offset(bottom_half, False, 1, tileW/4, -tileH/4)
 
         combined_layer = pdb.gimp_image_merge_down(img, top_half, 2)
         pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
-        pdb.gimp_selection_grow(img,1)
+        
+        pdb.gimp_selection_grow(img,0)
+        pdb.gimp_selection_sharpen(img)
         pdb.gimp_selection_invert(img)
         pdb.gimp_edit_cut(combined_layer)
         return combined_layer
@@ -259,11 +265,18 @@ class Tiles:
         ice = Transitions.make_tile(img, transitions_prefix + "ic_e", 3*tileW, 3*tileH)
         icw = Transitions.make_tile(img, transitions_prefix + "ic_w", 2*tileW, 3*tileH)
         #Transitions.merge_transitions(img, transitions_prefix, transitions_layer)
+        
         pdb.gimp_drawable_set_visible(icn, True)
         pdb.gimp_drawable_set_visible(ics, True)
         pdb.gimp_drawable_set_visible(ice, True)
         pdb.gimp_drawable_set_visible(icw, True)
-        Util.merge_layers(img,[icw, ice, ics, icn, layer])
+        work_layer = Util.merge_layers(img,[icw, ice, ics, icn])
+
+        get_ic_selection(tileW, tileH)
+
+        work_layer = Util.merge_layers(img,[work_layer, layer])
+        pdb.gimp_selection_invert(img)
+        pdb.gimp_edit_cut(work_layer)
         
         work_layer = img.active_layer
         inside_corners = Tiles.make_inside_corners(img,work_layer, work_layer,tileW,tileH)
