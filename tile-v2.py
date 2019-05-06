@@ -28,6 +28,7 @@ def get_ic_n_selection(tileW, tileH): return Util.offset_selection([tileW/2, til
 def get_ic_s_selection(tileW, tileH): return Util.offset_selection([tileW/2, tileH/2+tileH, tileW, tileH, tileW+tileW/2, tileH+tileH/2, tileW, 2*tileH], 2*tileW, 2*tileH+tileH/2)
 def get_ic_e_selection(tileW, tileH): return Util.offset_selection([tileW, tileH, tileW+tileW/2, tileH/2, 2*tileW, tileH, tileW+tileW/2, tileH+tileH/2], 2*tileW, 2*tileH+tileH/2)
 def get_ic_w_selection(tileW, tileH): return Util.offset_selection([0, tileH, tileW/2, tileH/2, tileW, tileH, tileW/2, tileH + tileH/2], 2*tileW, 2*tileH+tileH/2)
+def get_base_selection(tileW, tileH): return Util.offset_selection([0, tileH, tileW/2, tileH/2, tileW, tileH, tileW/2, tileH + tileH/2], 0, 0)
     
 ###########################################################
 #
@@ -178,9 +179,10 @@ class Tiles:
             if sliceType[index] == "sw":
                 dx -= 1
                 dy += 1
-            if sliceType[index] == "se":
-                dx += 1
-                dy += 1
+            if sliceType[index] == "ne":
+                dy -= 1
+            if sliceType[index] == "nw":
+                dy -= 1                
             
             pdb.gimp_layer_set_offsets(selId, pos[0]+dx, pos[1]+dy)
             corner_layers.append(selId)
