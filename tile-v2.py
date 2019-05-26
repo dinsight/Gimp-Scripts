@@ -45,7 +45,7 @@ class Util:
 
     @staticmethod
     def merge_layers(img, layer_list):
-        if len(layer_list)>0:
+        if len(layer_list)>1:
             img.active_layer = layer_list[0]
             last_layer = None
             for index in range(len(layer_list)):
@@ -54,7 +54,7 @@ class Util:
                     last_layer = pdb.gimp_image_merge_down(img, l, 0)
                     layer_list[index+1]=last_layer
             return last_layer
-        return None
+        return layer_list[0] if len(layer_list)==1 else None
 
     @staticmethod
     def offset_selection(sel, dx, dy ):
@@ -92,7 +92,8 @@ class Export:
     def export_transition(output_path, img, layer, name, ext, selection):
         img.active_layer = layer
         pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(selection),selection)
-        pdb.gimp_selection_grow(img,1)
+        pdb.gimp_selection_sharpen(img)
+        pdb.gimp_selection_flood(img)
         pdb.gimp_edit_copy(layer)
         fsel = pdb.gimp_edit_paste(layer, False)
         new = pdb.gimp_floating_sel_to_layer(fsel)
@@ -120,6 +121,59 @@ class Export:
             pdb.gimp_image_delete(layer_img)
         pdb.gimp_image_delete(img)
 
+###########################################################
+#
+#
+###########################################################
+class Transitions:
+
+    @staticmethod
+    def make_transitions_from_base_tile(img, layer, tileW, tileH):
+        img.resize(tileW*4, tileH*4+tileH/2,tileW, tileH)
+        #left corner
+        Transitions.make_tile(img, transitions_prefix + "lle", 0, tileH)
+        #right corner
+        Transitions.make_tile(img, transitions_prefix + "ure", 2*tileW, tileH)
+        #up edge
+        Transitions.make_tile(img, transitions_prefix + "ue", tileW+tileW/2, tileH/2)
+        #right edge
+        Transitions.make_tile(img, transitions_prefix + "re", tileW+tileW/2, tileH + tileH/2)
+        #left edge
+        Transitions.make_tile(img, transitions_prefix + "le", tileW/2, tileH/2)
+        #down edge
+        Transitions.make_tile(img, transitions_prefix + "de", tileW/2, tileH + tileH/2)
+        #lower right corner
+        Transitions.make_tile(img, transitions_prefix + "lre", tileW, 2 * tileH)
+        #upper left corner
+        Transitions.make_tile(img, transitions_prefix + "ule", tileW, 0)
+        Transitions.merge_transitions(img, transitions_prefix, transitions_layer)        
+
+    @staticmethod
+    def make_tile(img, name, x , y):
+        base = next(z for z in img.layers if z.name == baseLayerName )
+        layer = base.copy()
+        layer.name = name
+        layer.set_offsets(x, y)
+        img.add_layer(layer, 0)
+        return layer
+
+    @staticmethod
+    def merge_transitions(img, withPrefix, destLayer):
+        for l in img.layers:
+            if l.name.startswith(withPrefix):
+                pdb.gimp_drawable_set_visible(l, True)
+            else:
+                pdb.gimp_drawable_set_visible(l, False)
+        allTrans = pdb.gimp_image_merge_visible_layers(img, 0)
+        allTrans.name = destLayer
+        pdb.gimp_layer_resize_to_image_size(allTrans)
+
+    @staticmethod       
+    def select_transition(img, layer, tileName, tileW, tileH, grow=0):
+        sel = eval("get_" + tileName+ "_selection(tileW, tileH)")
+        pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
+        pdb.gimp_selection_grow(img,grow)
+        
 ###########################################################
 #
 #
@@ -160,6 +214,7 @@ class Tiles:
             ss = Tiles.get_tile_slice(img, edges[index], sliceType[index], tileW, tileH)
             pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(ss),ss)
             pdb.gimp_selection_sharpen(img)
+            pdb.gimp_selection_flood(img)
             pdb.gimp_edit_copy(sourceLayer)
 
             #paste slice
@@ -171,18 +226,20 @@ class Tiles:
 
             pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(ds),ds)
             pdb.gimp_selection_sharpen(img)
+            pdb.gimp_selection_flood(img)
             #pdb.gimp_selection_grow(img,1)
             pdb.gimp_edit_cut(destLayer)
             
             dx = ds[0]-ss[0]
             dy = ds[1]-ss[1]
-            if sliceType[index] == "sw":
-                dx -= 1
-                dy += 1
-            if sliceType[index] == "ne":
-                dy -= 1
-            if sliceType[index] == "nw":
-                dy -= 1                
+
+            #if sliceType[index] == "sw":
+            #    dx -= 1
+            #    dy += 1
+            #if sliceType[index] == "ne":
+            #    dy -= 1
+            #if sliceType[index] == "nw":
+            #    dy -= 1                
             
             pdb.gimp_layer_set_offsets(selId, pos[0]+dx, pos[1]+dy)
             corner_layers.append(selId)
@@ -214,6 +271,7 @@ class Tiles:
         combined_layer = pdb.gimp_image_merge_down(img, top_half, 2)
         pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
         pdb.gimp_selection_sharpen(img)
+        pdb.gimp_selection_flood(img)
         pdb.gimp_selection_invert(img)
         pdb.gimp_edit_cut(combined_layer)
         return combined_layer
@@ -292,62 +350,9 @@ class Tiles:
         dest_layer = Util.merge_layers(img,corners)
         pdb.gimp_layer_resize_to_image_size(dest_layer)
 
-        outside_corners = Tiles.make_outside_corners(img,dest_layer,dest_layer,tileW,tileH)
-        pdb.gimp_layer_resize_to_image_size(outside_corners)
+        #outside_corners = Tiles.make_outside_corners(img,dest_layer,dest_layer,tileW,tileH)
+        #pdb.gimp_layer_resize_to_image_size(outside_corners)
         
-        
-###########################################################
-#
-#
-###########################################################
-class Transitions:
-
-    @staticmethod
-    def make_transitions_from_base_tile(img, layer, tileW, tileH):
-        img.resize(tileW*4, tileH*4+tileH/2,tileW, tileH)
-        #left corner
-        Transitions.make_tile(img, transitions_prefix + "lle", 0, tileH)
-        #right corner
-        Transitions.make_tile(img, transitions_prefix + "ure", 2*tileW, tileH)
-        #up edge
-        Transitions.make_tile(img, transitions_prefix + "ue", tileW+tileW/2, tileH/2)
-        #right edge
-        Transitions.make_tile(img, transitions_prefix + "re", tileW+tileW/2, tileH + tileH/2)
-        #left edge
-        Transitions.make_tile(img, transitions_prefix + "le", tileW/2, tileH/2)
-        #down edge
-        Transitions.make_tile(img, transitions_prefix + "de", tileW/2, tileH + tileH/2)
-        #lower right corner
-        Transitions.make_tile(img, transitions_prefix + "lre", tileW, 2 * tileH)
-        #upper left corner
-        Transitions.make_tile(img, transitions_prefix + "ule", tileW, 0)
-        Transitions.merge_transitions(img, transitions_prefix, transitions_layer)        
-
-    @staticmethod
-    def make_tile(img, name, x , y):
-        base = next(z for z in img.layers if z.name == baseLayerName )
-        layer = base.copy()
-        layer.name = name
-        layer.set_offsets(x, y)
-        img.add_layer(layer, 0)
-        return layer
-
-    @staticmethod
-    def merge_transitions(img, withPrefix, destLayer):
-        for l in img.layers:
-            if l.name.startswith(withPrefix):
-                pdb.gimp_drawable_set_visible(l, True)
-            else:
-                pdb.gimp_drawable_set_visible(l, False)
-        allTrans = pdb.gimp_image_merge_visible_layers(img, 0)
-        allTrans.name = destLayer
-        pdb.gimp_layer_resize_to_image_size(allTrans)
-
-    @staticmethod       
-    def select_transition(img, layer, tileName, tileW, tileH, grow=0):
-        sel = eval("get_" + tileName+ "_selection(tileW, tileH)")
-        pdb.gimp_image_select_polygon(img, CHANNEL_OP_REPLACE,len(sel),sel)
-        pdb.gimp_selection_grow(img,grow)
 
 ###########################################################
 #image= gimp.image_list()[0]
@@ -476,4 +481,3 @@ register(
          domain=("gimp20-python", gimp.locale_directory))
 
 main()
-
