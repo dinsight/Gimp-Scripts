@@ -334,11 +334,14 @@ class Tiles:
         pdb.gimp_drawable_set_visible(ics, True)
         pdb.gimp_drawable_set_visible(ice, True)
         pdb.gimp_drawable_set_visible(icw, True)
-        Util.merge_layers(img,[icw, ice, ics, icn, layer])
+        Util.merge_layers(img,[icw, ice, ics, icn])
         
         work_layer = img.active_layer
-        inside_corners = Tiles.make_inside_corners(img,work_layer, work_layer,tileW,tileH)
-        dest_layer = Util.merge_layers(img,[inside_corners, work_layer])
+        pdb.gimp_layer_resize_to_image_size(work_layer)
+        
+        inside_corners = Tiles.make_inside_corners(img,layer, work_layer,tileW,tileH)
+        pdb.gimp_layer_resize_to_image_size(inside_corners)
+        #dest_layer = Util.merge_layers(img,[inside_corners, work_layer])
 
     @staticmethod
     def make_seamless_test(img, layer, tileW, tileH):
