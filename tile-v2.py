@@ -129,28 +129,29 @@ class Transitions:
 
     @staticmethod
     def make_transitions_from_base_tile(img, layer, tileW, tileH):
+        src = layer.name
         img.resize(tileW*4, tileH*4+tileH/2,tileW, tileH)
         #left corner
-        Transitions.make_tile(img, transitions_prefix + "lle", 0, tileH)
+        Transitions.make_tile(img, src, transitions_prefix + "lle", 0, tileH)
         #right corner
-        Transitions.make_tile(img, transitions_prefix + "ure", 2*tileW, tileH)
+        Transitions.make_tile(img, src, transitions_prefix + "ure", 2*tileW, tileH)
         #up edge
-        Transitions.make_tile(img, transitions_prefix + "ue", tileW+tileW/2, tileH/2)
+        Transitions.make_tile(img, src, transitions_prefix + "ue", tileW+tileW/2, tileH/2)
         #right edge
-        Transitions.make_tile(img, transitions_prefix + "re", tileW+tileW/2, tileH + tileH/2)
+        Transitions.make_tile(img, src, transitions_prefix + "re", tileW+tileW/2, tileH + tileH/2)
         #left edge
-        Transitions.make_tile(img, transitions_prefix + "le", tileW/2, tileH/2)
+        Transitions.make_tile(img, src, transitions_prefix + "le", tileW/2, tileH/2)
         #down edge
-        Transitions.make_tile(img, transitions_prefix + "de", tileW/2, tileH + tileH/2)
+        Transitions.make_tile(img, src, transitions_prefix + "de", tileW/2, tileH + tileH/2)
         #lower right corner
-        Transitions.make_tile(img, transitions_prefix + "lre", tileW, 2 * tileH)
+        Transitions.make_tile(img, src, transitions_prefix + "lre", tileW, 2 * tileH)
         #upper left corner
-        Transitions.make_tile(img, transitions_prefix + "ule", tileW, 0)
+        Transitions.make_tile(img, src, transitions_prefix + "ule", tileW, 0)
         Transitions.merge_transitions(img, transitions_prefix, transitions_layer)        
 
     @staticmethod
-    def make_tile(img, name, x , y):
-        base = next(z for z in img.layers if z.name == baseLayerName )
+    def make_tile(img, src, name, x , y):
+        base = next(z for z in img.layers if z.name == src )
         layer = base.copy()
         layer.name = name
         layer.set_offsets(x, y)
@@ -325,10 +326,11 @@ class Tiles:
 
     @staticmethod
     def make_seamless_inside_corners(img, layer, tileW, tileH):
-        icn = Transitions.make_tile(img, transitions_prefix + "ic_n", 2*tileW+tileW/2, 2*tileH+tileH/2)
-        ics = Transitions.make_tile(img, transitions_prefix + "ic_s", 2*tileW+tileW/2, 3*tileH+tileH/2)
-        ice = Transitions.make_tile(img, transitions_prefix + "ic_e", 3*tileW, 3*tileH)
-        icw = Transitions.make_tile(img, transitions_prefix + "ic_w", 2*tileW, 3*tileH)
+        src = layer.name
+        icn = Transitions.make_tile(img, src, transitions_prefix + "ic_n", 2*tileW+tileW/2, 2*tileH+tileH/2)
+        ics = Transitions.make_tile(img, src, transitions_prefix + "ic_s", 2*tileW+tileW/2, 3*tileH+tileH/2)
+        ice = Transitions.make_tile(img, src, transitions_prefix + "ic_e", 3*tileW, 3*tileH)
+        icw = Transitions.make_tile(img, src, transitions_prefix + "ic_w", 2*tileW, 3*tileH)
         #Transitions.merge_transitions(img, transitions_prefix, transitions_layer)
         pdb.gimp_drawable_set_visible(icn, True)
         pdb.gimp_drawable_set_visible(ics, True)
