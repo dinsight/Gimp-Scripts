@@ -29,6 +29,8 @@ def get_ic_s_selection(tileW, tileH): return Util.offset_selection([tileW/2, til
 def get_ic_e_selection(tileW, tileH): return Util.offset_selection([tileW, tileH, tileW+tileW/2, tileH/2, 2*tileW, tileH, tileW+tileW/2, tileH+tileH/2], 2*tileW, 2*tileH+tileH/2)
 def get_ic_w_selection(tileW, tileH): return Util.offset_selection([0, tileH, tileW/2, tileH/2, tileW, tileH, tileW/2, tileH + tileH/2], 2*tileW, 2*tileH+tileH/2)
 def get_base_selection(tileW, tileH): return Util.offset_selection([0, tileH, tileW/2, tileH/2, tileW, tileH, tileW/2, tileH + tileH/2], 0, 0)
+
+def get_ic_selection(tileW, tileH): return Util.offset_selection([0,tileH,tileW,0,2*tileW,tileH,tileW,2*tileH], 2*tileW, 2*tileH+tileH/2)
     
 ###########################################################
 #
@@ -326,12 +328,12 @@ class Tiles:
 
     @staticmethod
     def make_seamless_inside_corners(img, layer, tileW, tileH):
-        src = layer.name
+        src = 'base'
         icn = Transitions.make_tile(img, src, transitions_prefix + "ic_n", 2*tileW+tileW/2, 2*tileH+tileH/2)
         ics = Transitions.make_tile(img, src, transitions_prefix + "ic_s", 2*tileW+tileW/2, 3*tileH+tileH/2)
         ice = Transitions.make_tile(img, src, transitions_prefix + "ic_e", 3*tileW, 3*tileH)
         icw = Transitions.make_tile(img, src, transitions_prefix + "ic_w", 2*tileW, 3*tileH)
-        #Transitions.merge_transitions(img, transitions_prefix, transitions_layer)
+        
         pdb.gimp_drawable_set_visible(icn, True)
         pdb.gimp_drawable_set_visible(ics, True)
         pdb.gimp_drawable_set_visible(ice, True)
@@ -343,21 +345,7 @@ class Tiles:
         
         inside_corners = Tiles.make_inside_corners(img,layer, work_layer,tileW,tileH)
         pdb.gimp_layer_resize_to_image_size(inside_corners)
-        #dest_layer = Util.merge_layers(img,[inside_corners, work_layer])
-
-    @staticmethod
-    def make_seamless_test(img, layer, tileW, tileH):
-        corners = []
-        corners.append(Tiles.make_seamless_tile(img, layer, "le" , tileW, tileH, ""))
-        corners.append(Tiles.make_seamless_tile(img, layer, "ue" , tileW, tileH, "tldr"))
-        corners.append(Tiles.make_seamless_tile(img, layer, "re" , tileW, tileH, ""))
-        corners.append(Tiles.make_seamless_tile(img, layer, "de" , tileW, tileH, "tldr"))
-        dest_layer = Util.merge_layers(img,corners)
-        pdb.gimp_layer_resize_to_image_size(dest_layer)
-
-        #outside_corners = Tiles.make_outside_corners(img,dest_layer,dest_layer,tileW,tileH)
-        #pdb.gimp_layer_resize_to_image_size(outside_corners)
-        
+        dest_layer = Util.merge_layers(img,[inside_corners, work_layer])
 
 ###########################################################
 #image= gimp.image_list()[0]
@@ -462,26 +450,6 @@ register(
          ],
          [],
          Export.export_transitions,
-         menu="<Image>/Filters/Alex's/Tile Library",
-         domain=("gimp20-python", gimp.locale_directory))
-
-register(
-         "python_fu_make_seamless_test",
-         N_("Make Seamless Transitions"),
-         """Make Seamless Transitions""",
-         "Alex Cotoman",
-         "Alex Cotoman",
-         "2019",
-         _("_TEST. Make Seamless Transition..."),
-         "*",
-         [
-          (PF_IMAGE, "image", "Input image", None),
-          (PF_DRAWABLE, "layer", "Input layer", None),
-          (PF_INT, "tileW", "Tile Width", 128),
-          (PF_INT, "tileH", "Tile Height", 64)
-          ],
-         [],
-         Tiles.make_seamless_test,
          menu="<Image>/Filters/Alex's/Tile Library",
          domain=("gimp20-python", gimp.locale_directory))
 
