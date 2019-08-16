@@ -26,6 +26,7 @@ namespace ConsoleUnitTest
     private Color[] colors;
     private float[] intervals;
     private float maxFrequency;
+    private float maxAmplitude;
     private Point origin;
     private Action<float, float, Color> draw;
 
@@ -47,37 +48,52 @@ namespace ConsoleUnitTest
       private float[] intervals;
       private IsometricMapper mapper;
       private Action<float, float, Color> draw;
+      private float maxAmplitude;
+      private float lightFrequency;
+      private float waterFrequency;
 
       public MountainGeneratorBuilder WithMapper(IsometricMapper mapper) {
         this.mapper = mapper;
         return this;
       }
 
-      public MountainGeneratorBuilder WithHeight(float height) {
+      public MountainGeneratorBuilder MapHeight(float height) {
         this.height = height;
         return this;
       }
-      public MountainGeneratorBuilder WithGradient(int gradSize) {
+      public MountainGeneratorBuilder PerlinGradient(int gradSize) {
         this.gradSize = gradSize;
         return this;
       }
-      public MountainGeneratorBuilder WithTileSize(int tileSize) {
+      public MountainGeneratorBuilder TileSize(int tileSize) {
         this.tileSize = tileSize;
         return this;
       }
-      public MountainGeneratorBuilder WithTileCount(int tileCount) {
+      public MountainGeneratorBuilder TileCount(int tileCount) {
         this.tileCount = tileCount;
         return this;
       }
-      public MountainGeneratorBuilder WithMaxFrequency(float maxFrequency) {
+      public MountainGeneratorBuilder MaxTerrainFrequency(float maxFrequency) {
         this.maxFrequency = maxFrequency;
         return this;
       }
-      public MountainGeneratorBuilder WithSeed(int seed) {
+      public MountainGeneratorBuilder LightFrequency(float lightFrequency) {
+        this.lightFrequency = lightFrequency;
+        return this;
+      }
+      public MountainGeneratorBuilder WaterFrequency(float waterFrequency) {
+        this.waterFrequency = waterFrequency;
+        return this;
+      }
+      public MountainGeneratorBuilder MaxTerrainAmplitude(float maxAmplitude) {
+        this.maxAmplitude = maxAmplitude;
+        return this;
+      }
+      public MountainGeneratorBuilder RandomSeed(int seed) {
         this.randomSeed = seed;
         return this;
       }
-      public MountainGeneratorBuilder WithDrawingFunction(Action<float,float,Color> draw) {
+      public MountainGeneratorBuilder DrawingFunction(Action<float,float,Color> draw) {
         this.draw = draw;
         return this;
       }
@@ -95,17 +111,19 @@ namespace ConsoleUnitTest
         terrain.tileSize = tileSize;
         terrain.tileCount = tileCount;
         terrain.imageSize = tileCount * tileSize;
-        terrain.lightTextureFrq = 130f / terrain.ImageSize;
-        terrain.waterTextureFrq = 5f / terrain.ImageSize;
+        terrain.lightTextureFrq = lightFrequency / terrain.ImageSize;
+        terrain.waterTextureFrq = waterFrequency / terrain.ImageSize;
         terrain.randomSeed = randomSeed;
         terrain.colors = colors;
         terrain.intervals = intervals;
         terrain.mapper = mapper;
         terrain.maxFrequency = maxFrequency;
+        terrain.maxAmplitude = maxAmplitude;
         var grad = terrain.GenerateGradient(gradSize);
+        var gradWater = terrain.GenerateGradient(gradSize);
         terrain.landscapeTexture = new Perlin(grad);
         terrain.lightTexture = terrain.landscapeTexture;//use the same noise
-        terrain.waterTexture = terrain.landscapeTexture;//use the same noise
+        terrain.waterTexture = new Perlin(gradWater);
         terrain.origin = new Point(terrain.ImageSize / 2 - 1, terrain.ImageSize / 2 - 1 );
         return terrain;
       }
@@ -135,14 +153,21 @@ namespace ConsoleUnitTest
       var colorStart = topLimIndex == 0 ? colors[0] : colors[topLimIndex - 1];
 
       var color = Blend(colorStart, colorEnd, 1 - (float)(val - bottomValue) / (topvalue - bottomValue));
-      if (brightness > 0 && val > 0.1)
-        return Brightness(color, 1 - brightness);
-
-      if (water > 0 && val <= 0.1)
-        return Brightness(color, 1 - water);
+      //var beam = 1 - j/(2*imageSize);
+      //color = Brightness(color, beam);
+      
+      if (brightness > 0 && val > intervals[0]){
+        color = Brightness(color, 1 - brightness);
+      }else 
+      if (val <= intervals[0]){
+        water = water<0?0:water;
+        var waterChop = 0.3f * (1+waterTexture.Noise(40 * i/imageSize, 40 * j/imageSize))/2;
+        water += waterChop;
+        color = Brightness(color, 1 - (1*water));
+      }
       return color;
     }
-
+    
     private Color Blend(Color color, Color backColor, double amount) {
       byte r = (byte)((color.Red * amount) + backColor.Red * (1 - amount));
       byte g = (byte)((color.Green * amount) + backColor.Green * (1 - amount));
@@ -159,9 +184,9 @@ namespace ConsoleUnitTest
     private float GetHeight(float i, float j) {
       var gx = i / ImageSize;
       var gy = j / ImageSize;
-      var pn = 9 * landscapeTexture.Noise(1.2f * maxFrequency * gx, 1.2f * maxFrequency * gy)
-        + 1.2 * landscapeTexture.Noise(5 * maxFrequency * gx, 5 * maxFrequency * gy)
-        //+ 1.2 * perlin.Noise(2 * frq * gx, 2 * frq * gy)
+      var pn = maxAmplitude * landscapeTexture.Noise(maxFrequency * gx, maxFrequency * gy)
+        + (1/maxAmplitude) * landscapeTexture.Noise(maxFrequency * gx, maxFrequency * gy)
+        //+ 0.2 * landscapeTexture.Noise(12 * gx, 12 * gy)
         ;// * amplitude;
       var gd = Point.Distance(new Point(i, j), new Point(ImageSize / 2, ImageSize / 2));
       var td = Point.Distance(new Point(0, ImageSize / 2), new Point(ImageSize / 2, ImageSize / 2));
