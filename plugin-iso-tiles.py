@@ -6,6 +6,7 @@ import math
 
 gettext.install("resynthesizer", gimp.locale_directory, unicode=True)
 Tile = collections.namedtuple("Tile",['name', "inset_type"])
+Settings = collections.namedtuple("Settings",["width", "height", "inset"])
 
 BLANK                 = int('0000000000000000',2)
 ROUND_INSIDE_TOP      = int('0000000000000001',2)
@@ -66,21 +67,25 @@ outside_corners_with_edges = {
     Tile("c12", ROUND_OUTSIDE_RIGHT):    (5,3),
     }
 
+settings = None
 #----------------------------------------------------------------------
 # Utils
 #----------------------------------------------------------------------
-def select_tile(img, w, h, dx, dy):
+def select_diamond_shape(img, w, h, dx, dy):
     selection = [0+dx, h/2+dy, w/2+dx, dy, w+dx, h/2+dy, w/2+dx, h+dy]
     pdb.gimp_image_select_polygon(img, gimpenums.CHANNEL_OP_REPLACE,len(selection),selection)
     return selection
-def calc_tile_pos(tile_set, tile, w, h, off_x=0, off_y=0):
+def calc_tile_offset(tile_set, tile, w, h, off_x=0, off_y=0):
     dx = (tile_set[tile][0]) * w/2 + off_x
     dy = (tile_set[tile][1]) * h/2 + off_y
     return (dx, dy)
-def select_tile_inset(img, tile_set, w, h, tile, inset_size):
-    pos = calc_tile_pos(tile_set, tile, w, h)
-    (dx, dy) = (pos[0], pos[1])
-    selection = select_tile(img, w, h, dx, dy)
+def select_tile_inset(img, tile_set, tile):
+    w = settings.width
+    h = settings.height
+    inset_size = settings.inset
+    off = calc_tile_offset(tile_set, tile, w, h)
+    (dx, dy) = (off[0], off[1])
+    selection = select_diamond_shape(img, w, h, dx, dy)
     d=math.sqrt(w/2.0*w/2.0+h/2.0*h/2.0)
     def to_sel_index(diamond_index):
       return (2*diamond_index, 1+2*diamond_index)
@@ -137,10 +142,11 @@ def iso_tiles(image, drawable, tileSize=128):
                    gimpenums.NORMAL_MODE)
     img.add_layer(l)
 
-    inset_size = 41.0
+    global settings
+    settings = Settings(w, h, 41.0)
     ts = inside_corners_with_edges 
     for tile in ts.keys():
-        select_tile_inset(img, ts, w, h, tile, inset_size)
+        select_tile_inset(img, ts, tile)
         pdb.gimp_edit_fill(l, gimpenums.FOREGROUND_FILL)
 
     #pdb.gimp_selection_none(img)
