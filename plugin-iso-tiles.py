@@ -5,7 +5,7 @@ import collections
 import math
 
 gettext.install("resynthesizer", gimp.locale_directory, unicode=True)
-Tile = collections.namedtuple("Tile",['name', "inset_type"])
+Tile = collections.namedtuple("Tile",["inset_type", "x_index", "y_index", "show"])
 Settings = collections.namedtuple("Settings",["width", "height", "inset", "map_weight", "autism", "neighbourhood", "trys"])
 
 BLANK                 = int('0000000000000000',2)
@@ -22,77 +22,65 @@ INSET_TOP_RIGHT       = int('0000001000000000',2)
 INSET_BOTTOM_LEFT     = int('0000010000000000',2)
 INSET_BOTTOM_RIGHT    = int('0000100000000000',2)
 
-inside_corners_with_edges = {
-    Tile("a00", INSET_TOP_RIGHT):         (1,0),
-    Tile("a01", ROUND_INSIDE_TOP):        (2,1),
-    Tile("a02", INSET_TOP_LEFT):          (3,0),
-    Tile("a06", INSET_BOTTOM_RIGHT):      (4,1),
-    Tile("a07", ROUND_INSIDE_RIGHT):      (3,2),
-    Tile("a08", INSET_TOP_RIGHT):         (4,3),
-    Tile("a09", INSET_BOTTOM_LEFT):       (0,1),
-    Tile("a10", ROUND_INSIDE_LEFT):       (1,2),
-    Tile("a11", INSET_TOP_LEFT):          (0,3),
-    Tile("a12", INSET_BOTTOM_RIGHT):      (1,4),
-    Tile("a13", ROUND_INSIDE_BOTTOM):     (2,3),
-    Tile("a14", INSET_BOTTOM_LEFT):       (3,4),
-}
-
-inside_corners_with_edges_plane = {
-    Tile("b01", ROUND_INSIDE_LEFT):       (0,2),
-    Tile("b02", BLANK):                   (1,1),
-    Tile("b03", ROUND_INSIDE_TOP):        (2,0),
-    Tile("b04", BLANK):                   (1,3),
-    Tile("b05", BLANK):                   (2,2),
-    Tile("b06", BLANK):                   (3,1),
-    Tile("b07", BLANK):                   (2,4),
-    Tile("b08", BLANK):                   (3,3),
-    Tile("b09", BLANK):                   (4,2),
-    Tile("b10", ROUND_INSIDE_BOTTOM):     (3,5),
-    Tile("b11", BLANK):                   (4,4),
-    Tile("b12", ROUND_INSIDE_RIGHT):      (5,3),
-}
-
-outside_corners_with_edges = {
-    Tile("c01", ROUND_OUTSIDE_LEFT):     (0,2),
-    Tile("c02", INSET_TOP_LEFT):         (1,1),
-    Tile("c03", ROUND_OUTSIDE_TOP):      (2,0),
-    Tile("c04", INSET_BOTTOM_LEFT):      (1,3),
-    Tile("c05", BLANK):                  (2,2),
-    Tile("c06", INSET_TOP_RIGHT):        (3,1),
-    Tile("c07", INSET_BOTTOM_LEFT):      (2,4),
-    Tile("c08", BLANK):                  (3,3),
-    Tile("c09", INSET_TOP_RIGHT):        (4,2),
-    Tile("c10", ROUND_OUTSIDE_BOTTOM):   (3,5),
-    Tile("c11", INSET_BOTTOM_RIGHT):     (4,4),
-    Tile("c12", ROUND_OUTSIDE_RIGHT):    (5,3),
+ts_oc = { 
+      "rol": Tile(ROUND_OUTSIDE_LEFT, 0,2, True),
+      "rot": Tile(ROUND_OUTSIDE_TOP, 1,1, True),
+      "rob": Tile(ROUND_OUTSIDE_BOTTOM, 1,3, True),
+      "ror": Tile(ROUND_OUTSIDE_RIGHT, 2,2, True),
+    }
+ts_side1 = { 
+      "rol": Tile(ROUND_OUTSIDE_LEFT, 0,5, False),
+      "itl": Tile(INSET_TOP_LEFT, 1,4, True),
+      "rot": Tile(ROUND_OUTSIDE_TOP, 2,3, False),
+      "rob": Tile(ROUND_OUTSIDE_BOTTOM, 1,6, False),
+      "ibr": Tile(INSET_BOTTOM_RIGHT, 2,5, True),
+      "ror": Tile(ROUND_OUTSIDE_RIGHT, 3,4, False),
+    }
+ts_side2 = { 
+      "rol": Tile(ROUND_OUTSIDE_LEFT, 0,7, False),
+      "rot": Tile(ROUND_OUTSIDE_TOP, 1,6, False),
+      "rob": Tile(ROUND_OUTSIDE_BOTTOM, 2,9, False),
+      "ror": Tile(ROUND_OUTSIDE_RIGHT, 3,8, False),
+      "itr": Tile(INSET_TOP_RIGHT, 2,7, True),
+      "ibl": Tile(INSET_BOTTOM_LEFT, 1,8, True),
     }
 
-outside_corners_with_edges_step_1 = {
-    Tile("c01", ROUND_OUTSIDE_LEFT):     (0,2),
-    Tile("c02", INSET_TOP_LEFT):         (1,1),
-    Tile("c03", ROUND_OUTSIDE_TOP):      (2,0),
-    Tile("c04", INSET_BOTTOM_LEFT):      (1,3),
-    Tile("c05", BLANK):                  (2,2),
-    Tile("c06", INSET_TOP_RIGHT):        (3,1),
-    Tile("c10", ROUND_OUTSIDE_BOTTOM):   (2,4),
-    Tile("c11", INSET_BOTTOM_RIGHT):     (3,3),
-    Tile("c12", ROUND_OUTSIDE_RIGHT):    (4,2),
+full_tile = { 
+      "itl": Tile(INSET_TOP_LEFT, 0,0, False),
+      "itr": Tile(INSET_TOP_RIGHT, 2,0, False),
+      "ibl": Tile(INSET_BOTTOM_LEFT, 0,2, False),
+      "ibr": Tile(INSET_BOTTOM_RIGHT, 2,2, False),
+      "full": Tile(BLANK, 1,1, True),
+      "rol": Tile(ROUND_OUTSIDE_LEFT, -1,1, False),
+      "ror": Tile(ROUND_OUTSIDE_RIGHT, 3,1, False),
+      "rot": Tile(ROUND_OUTSIDE_TOP, 1,-1, False),
+      "rob": Tile(ROUND_OUTSIDE_BOTTOM, 1,3, False),
     }
-
 
 settings = None
 #----------------------------------------------------------------------
 # Utils
 #----------------------------------------------------------------------
+def get_settings(tileSize):
+    w = tileSize
+    h = tileSize/2
+    settings = Settings(w, h, 41.0, 0.7, 0.12, 30, 200)
+    return settings
+def filter_tileset(tile_set, arr_names):
+    res = []
+    for key, value in tile_set.items():
+      if key in arr_names:
+        res.append(value)
+    return res
 def select_diamond_shape(img, w, h, dx, dy):
     selection = [0+dx, h/2+dy, w/2+dx, dy, w+dx, h/2+dy, w/2+dx, h+dy]
     pdb.gimp_image_select_polygon(img, gimpenums.CHANNEL_OP_REPLACE,len(selection),selection)
     return selection
-def select_tile(img, tile, tile_index_x, tile_index_y):
+def select_tile(img, tile):
     w = settings.width
     h = settings.height
     inset_size = settings.inset
-    (dx, dy) = (tile_index_x * w/2, tile_index_y * h/2)
+    (dx, dy) = (tile.x_index * w/2, tile.y_index * h/2)
     selection = select_diamond_shape(img, w, h, dx, dy)
     d=math.sqrt(w/2.0*w/2.0+h/2.0*h/2.0)
     def to_sel_index(diamond_index):
@@ -139,95 +127,125 @@ def select_tile(img, tile, tile_index_x, tile_index_y):
     if tile.inset_type & INSET_BOTTOM_LEFT>0:    cut_poly((0, 1), (3, 2))
     if tile.inset_type & INSET_BOTTOM_RIGHT>0:   cut_poly((3, 0), (2, 1))
     
-def copy_tile(img, srcLayer, src_index_x, src_index_y, destLayer, dest_index_x, dest_index_y):
-  tile = Tile("blank", BLANK)
-  select_tile(img, tile, src_index_x, src_index_y)
+def copy_tile(img, srcLayer, src_tile, destLayer, dest_tile):
+  select_tile(img, src_tile)
   pdb.gimp_edit_copy(srcLayer)
-  select_tile(img, tile, dest_index_x, dest_index_y)
+  select_tile(img, dest_tile)
   fsel = pdb.gimp_edit_paste(destLayer, False)
   pdb.gimp_floating_sel_anchor(fsel)
 
+def place_tiles(img, ts, layer):
+  for tile in ts.values():
+    if tile.show == True:
+      select_tile(img, tile)
+      pdb.gimp_edit_fill(layer, gimpenums.FOREGROUND_FILL)
 
+def synth_tileset(img, layer, source, mask, arr_tiles=None):
+  if arr_tiles is None:
+    foreground = pdb.gimp_context_get_foreground()
+    pdb.gimp_image_select_color(img, gimpenums.CHANNEL_OP_REPLACE, layer, foreground)
+  else:
+    sel_channels = []
+    for item in arr_tiles:
+      select_tile(img, item)
+      sel_channels.append(pdb.gimp_selection_save(img))
+    pdb.gimp_selection_clear(img)
+    for s in sel_channels:
+      pdb.gimp_image_select_item(img, gimpenums.CHANNEL_OP_ADD, s)
+
+  pdb.gimp_selection_grow(img, 14)
+  pdb.plug_in_resynthesizer(img, layer, 
+                            int(True),
+                            int(True),
+                            1,
+                            source.ID,
+                            mask.ID,
+                            layer.ID,
+                            settings.map_weight,
+                            settings.autism,
+                            settings.neighbourhood,
+                            settings.trys)
 #----------------------------------------------------------------------
 #
 #----------------------------------------------------------------------
+
+def python_iso_select_tiles(image, drawable, x, y, tileSize=128):
+    global settings 
+    settings = get_settings(tileSize)
+    select_tile(image, Tile(BLANK, x, y, True))
+
 def iso_tiles(image, drawable, source, mask, tileSize=128):
-    w = tileSize
-    h = tileSize/2
     global settings
-    settings = Settings(w, h, 41.0, 0.5, 0.12, 30, 200)
+    settings = get_settings(tileSize)
     
     img = gimp.Image(8*settings.width,8*settings.height,gimpenums.RGB)
-    base_layer = gimp.Layer(img, "Base", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
-    img.add_layer(base_layer)
+    oc_layer = gimp.Layer(img, "OutsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+    img.add_layer(oc_layer)
 
-    #ts = outside_corners_with_edges_step_1
-    ts = { 
-      Tile("c01", ROUND_OUTSIDE_LEFT):     (0,2),
-      Tile("c03", ROUND_OUTSIDE_TOP):      (1,1),
-      Tile("c10", ROUND_OUTSIDE_BOTTOM):   (1,3),
-      Tile("c12", ROUND_OUTSIDE_RIGHT):    (2,2),
+    #Outside Corners
+    place_tiles(img, ts_oc, oc_layer)
+    synth_tileset(img, oc_layer, source, mask)
+
+    sides1_layer = gimp.Layer(img, "Sides1", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+    img.add_layer(sides1_layer)
+
+    #Side1
+    place_tiles(img, ts_side1, sides1_layer)
+    copy_tile(img, oc_layer, ts_oc["rol"], sides1_layer, ts_side1["rol"])
+    copy_tile(img, oc_layer, ts_oc["rot"], sides1_layer, ts_side1["rot"])
+    copy_tile(img, oc_layer, ts_oc["rob"], sides1_layer, ts_side1["rob"])
+    copy_tile(img, oc_layer, ts_oc["ror"], sides1_layer, ts_side1["ror"])
+    synth_tileset(img, sides1_layer, source, mask, filter_tileset(ts_side1, ["itl", "ibr"]))
+
+    sides2_layer = gimp.Layer(img, "Sides2", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+    img.add_layer(sides2_layer)
+
+    #Side2
+    place_tiles(img, ts_side2, sides2_layer)
+    copy_tile(img, oc_layer, ts_oc["rol"], sides2_layer, ts_side2["rol"])
+    copy_tile(img, oc_layer, ts_oc["rot"], sides2_layer, ts_side2["rot"])
+    copy_tile(img, oc_layer, ts_oc["rob"], sides2_layer, ts_side2["rob"])
+    copy_tile(img, oc_layer, ts_oc["ror"], sides2_layer, ts_side2["ror"])
+    synth_tileset(img, sides2_layer, source, mask, filter_tileset(ts_side2, ["itr", "ibl"]))
+
+    #Full tile
+    full_tile_layer = gimp.Layer(img, "FullTile", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+    img.add_layer(full_tile_layer)
+    place_tiles(img, full_tile, full_tile_layer)
+    copy_tile(img, sides1_layer, ts_side1["itl"], full_tile_layer, full_tile["itl"])
+    copy_tile(img, sides1_layer, ts_side1["ibr"], full_tile_layer, full_tile["ibr"])
+    copy_tile(img, sides2_layer, ts_side2["itr"], full_tile_layer, full_tile["itr"])
+    copy_tile(img, sides2_layer, ts_side2["ibl"], full_tile_layer, full_tile["ibl"])
+    copy_tile(img, sides2_layer, ts_side2["rol"], full_tile_layer, full_tile["rol"])
+    copy_tile(img, sides1_layer, ts_side1["ror"], full_tile_layer, full_tile["ror"])
+    copy_tile(img, sides2_layer, ts_side2["rot"], full_tile_layer, full_tile["rot"])
+    copy_tile(img, sides2_layer, ts_side2["rob"], full_tile_layer, full_tile["rob"])
+    synth_tileset(img, full_tile_layer, source, mask, filter_tileset(full_tile, ["full"]))
+
+    #Check tiling
+    check_layer = gimp.Layer(img, "Check Tiling", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+    img.add_layer(check_layer)
+
+    check_tiles = {
+      "t5": Tile(BLANK, 1,2, True),
+      "t6": Tile(BLANK, 2,1, True),
+      "t1": Tile(BLANK, 2,3, True),
+      "t3": Tile(BLANK, 3,2, True),
+      "t2": Tile(BLANK, 3,4, True),
+      "t4": Tile(BLANK, 4,3, True),
+      "t7": Tile(BLANK, 3,0, True),
+      "t8": Tile(BLANK, 4,1, True),
+      "t9": Tile(BLANK, 5,2, True),
     }
-
-    for tile in ts.keys():
-        select_tile(img, tile, ts[tile][0], ts[tile][1])
-        pdb.gimp_edit_fill(base_layer, gimpenums.FOREGROUND_FILL)
-
-    pdb.gimp_image_select_item(img, gimpenums.CHANNEL_OP_REPLACE, base_layer)
-    pdb.gimp_selection_grow(img, 2)
-    pdb.plug_in_resynthesizer(img, base_layer, 
-                              int(True),
-                              int(True),
-                              1,
-                              source.ID,
-                              mask.ID,
-                              base_layer.ID,
-                              settings.map_weight,
-                              settings.autism,
-                              settings.neighbourhood,
-                              settings.trys)
-
-    # l1_layer = gimp.Layer(img, "L1", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
-    # img.add_layer(l1_layer)
-    
-    # ts = { 
-    #   Tile("002", BLANK):(0,7),
-    #   Tile("001", BLANK):(1,6),
-    #   Tile("000", BLANK):(2,5),      
-
-    #   Tile("003", BLANK):(1,8),
-    #   Tile("004", BLANK):(2,7),
-    #   Tile("005", BLANK):(3,6),
-
-    #   Tile("006", BLANK):(2,9),
-    #   Tile("007", BLANK):(3,8),
-    #   Tile("008", BLANK):(4,7),
-    # }
-    # copy_tile(img, base_layer, 2, 2, l1_layer, 0, 7)
-    # copy_tile(img, base_layer, 2, 2, l1_layer, 1, 6)
-    # copy_tile(img, base_layer, 2, 2, l1_layer, 2, 5)
-    # copy_tile(img, base_layer, 2, 2, l1_layer, 1, 8)
-    # copy_tile(img, base_layer, 2, 2, l1_layer, 3, 6)
-    # copy_tile(img, base_layer, 2, 2, l1_layer, 2, 9)
-    # copy_tile(img, base_layer, 2, 2, l1_layer, 3, 8)
-    # copy_tile(img, base_layer, 2, 2, l1_layer, 4, 7)
-
-    # select_tile(img, tile, 2, 7)
-    # pdb.gimp_edit_fill(l1_layer, gimpenums.FOREGROUND_FILL)
-
-    '''
-    
-    l2 = gimp.Layer(img, "L2", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
-    img.add_layer(l2)
-    for tile in ts.keys():
-        select_tile(img, tile, ts[tile][0], ts[tile][1])
-        pdb.gimp_edit_fill(l2, gimpenums.FOREGROUND_FILL)
-    '''
-
-    # copy_tile(image, baseTile, 0, 0, l, 0 ,0)
-    # foreground = pdb.gimp_context_get_foreground()
-    # pdb.gimp_image_select_color(img, gimpenums.CHANNEL_OP_REPLACE, l, foreground)
-    # pdb.python_fu_heal_selection(img, l, 50, 0, 0)
+    copy_tile(img, full_tile_layer, full_tile["full"], check_layer, check_tiles["t1"])
+    copy_tile(img, full_tile_layer, full_tile["full"], check_layer, check_tiles["t2"])
+    copy_tile(img, full_tile_layer, full_tile["full"], check_layer, check_tiles["t3"])
+    copy_tile(img, full_tile_layer, full_tile["full"], check_layer, check_tiles["t4"])
+    copy_tile(img, full_tile_layer, full_tile["full"], check_layer, check_tiles["t5"])
+    copy_tile(img, full_tile_layer, full_tile["full"], check_layer, check_tiles["t6"])
+    copy_tile(img, full_tile_layer, full_tile["full"], check_layer, check_tiles["t7"])
+    copy_tile(img, full_tile_layer, full_tile["full"], check_layer, check_tiles["t8"])
+    copy_tile(img, full_tile_layer, full_tile["full"], check_layer, check_tiles["t9"])
 
     d = gimp.Display(img)
 
@@ -238,7 +256,7 @@ register(
   "Alex Cotoman",
   "2020 Alex Cotoman",  # Copyright 
   "2020",
-  N_("_Isometric tiles..."),
+  N_("_Create Isometric tiles..."),
   "RGB*, GRAY*",
   [
     (PF_IMAGE, "image",       "Input image", None),
@@ -249,7 +267,29 @@ register(
   ],
   [],
   iso_tiles,
-  menu="<Image>/Filters/Enhance",
+  menu="<Image>/Filters/Tiles",
+  domain=("resynthesizer", gimp.locale_directory)
+  )
+
+register(
+  "python_iso_select_tiles",
+  N_("Select Iso Tiles at Index"),
+  "Requires separate resynthesizer plugin.",
+  "Alex Cotoman",
+  "2020 Alex Cotoman",  # Copyright 
+  "2020",
+  N_("_Select tiles..."),
+  "RGB*, GRAY*",
+  [
+    (PF_IMAGE, "image",       "Input image", None),
+    (PF_DRAWABLE, "drawable", "Input drawable", None),
+    (PF_INT, "x", "X Index", 0),
+    (PF_INT, "y", "Y Index", 0),
+    (PF_INT, "tileSize", _("Tile width (pixels):"), 128),
+  ],
+  [],
+  python_iso_select_tiles,
+  menu="<Image>/Filters/Tiles",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
