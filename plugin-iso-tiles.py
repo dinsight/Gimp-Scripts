@@ -64,7 +64,7 @@ settings = None
 def get_settings(tileSize):
     w = tileSize
     h = tileSize/2
-    settings = Settings(w, h, 41.0, 0.7, 0.12, 30, 200)
+    settings = Settings(w, h, 41.0, 0.5, 0.12, 30, 200)
     return settings
 def filter_tileset(tile_set, arr_names):
     res = []
@@ -128,17 +128,23 @@ def select_tile(img, tile):
     if tile.inset_type & INSET_BOTTOM_RIGHT>0:   cut_poly((3, 0), (2, 1))
     
 def copy_tile(img, srcLayer, src_tile, destLayer, dest_tile):
+  antialias = pdb.gimp_context_get_antialias()
+  pdb.gimp_context_set_antialias(False)
   select_tile(img, src_tile)
   pdb.gimp_edit_copy(srcLayer)
   select_tile(img, dest_tile)
   fsel = pdb.gimp_edit_paste(destLayer, False)
   pdb.gimp_floating_sel_anchor(fsel)
+  pdb.gimp_context_set_antialias(antialias)
 
 def place_tiles(img, ts, layer):
+  antialias = pdb.gimp_context_get_antialias()
+  pdb.gimp_context_set_antialias(False)
   for tile in ts.values():
     if tile.show == True:
       select_tile(img, tile)
       pdb.gimp_edit_fill(layer, gimpenums.FOREGROUND_FILL)
+  pdb.gimp_context_set_antialias(antialias)
 
 def synth_tileset(img, layer, source, mask, arr_tiles=None):
   if arr_tiles is None:
@@ -153,7 +159,9 @@ def synth_tileset(img, layer, source, mask, arr_tiles=None):
     for s in sel_channels:
       pdb.gimp_image_select_item(img, gimpenums.CHANNEL_OP_ADD, s)
 
-  pdb.gimp_selection_grow(img, 14)
+  antialias = pdb.gimp_context_get_antialias()
+  pdb.gimp_context_set_antialias(True)
+  pdb.gimp_selection_grow(img, 3)
   pdb.plug_in_resynthesizer(img, layer, 
                             int(True),
                             int(True),
@@ -165,6 +173,7 @@ def synth_tileset(img, layer, source, mask, arr_tiles=None):
                             settings.autism,
                             settings.neighbourhood,
                             settings.trys)
+  pdb.gimp_context_set_antialias(antialias)                            
 #----------------------------------------------------------------------
 #
 #----------------------------------------------------------------------
@@ -216,13 +225,13 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     copy_tile(img, sides1_layer, ts_side1["ibr"], full_tile_layer, full_tile["ibr"])
     copy_tile(img, sides2_layer, ts_side2["itr"], full_tile_layer, full_tile["itr"])
     copy_tile(img, sides2_layer, ts_side2["ibl"], full_tile_layer, full_tile["ibl"])
-    copy_tile(img, sides2_layer, ts_side2["rol"], full_tile_layer, full_tile["rol"])
-    copy_tile(img, sides1_layer, ts_side1["ror"], full_tile_layer, full_tile["ror"])
-    copy_tile(img, sides2_layer, ts_side2["rot"], full_tile_layer, full_tile["rot"])
-    copy_tile(img, sides2_layer, ts_side2["rob"], full_tile_layer, full_tile["rob"])
+    copy_tile(img, oc_layer, ts_oc["rol"], full_tile_layer, full_tile["rol"])
+    copy_tile(img, oc_layer, ts_oc["ror"], full_tile_layer, full_tile["ror"])
+    copy_tile(img, oc_layer, ts_oc["rot"], full_tile_layer, full_tile["rot"])
+    copy_tile(img, oc_layer, ts_oc["rob"], full_tile_layer, full_tile["rob"])
     synth_tileset(img, full_tile_layer, source, mask, filter_tileset(full_tile, ["full"]))
 
-    #Check tiling
+    # Check tiling
     check_layer = gimp.Layer(img, "Check Tiling", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(check_layer)
 
