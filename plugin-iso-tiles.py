@@ -285,7 +285,7 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     #----------------------------------------Side1----------------------------------------
     place_tiles(img, ts_side1, sides1_layer)
     copy_tiles_with_prefix(img, oc_layer, ts_oc, sides1_layer, ts_side1, ["rol", "rot", "rob", "ror"])
-    synth_tileset(img, sides1_layer, source, mask, filter_tileset(ts_side1, ["itl", "ibr"]))
+    synth_tileset(img, sides1_layer, source, mask, filter_tileset(ts_side1, ["itl", "ibr"]), surrounds=1)
 
     sides2_layer = gimp.Layer(img, "Sides2", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(sides2_layer)
@@ -293,16 +293,17 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     #----------------------------------------Side2----------------------------------------
     place_tiles(img, ts_side2, sides2_layer)
     copy_tiles_with_prefix(img, oc_layer, ts_oc, sides2_layer, ts_side2, ["rol", "rot", "rob", "ror"])
-    synth_tileset(img, sides2_layer, source, mask, filter_tileset(ts_side2, ["itr", "ibl"]))
+    synth_tileset(img, sides2_layer, source, mask, filter_tileset(ts_side2, ["itr", "ibl"]), surrounds=1)
 
     #----------------------------------------Full tile----------------------------------------
     full_tile_layer = gimp.Layer(img, "FullTile", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(full_tile_layer)
     place_tiles(img, full_tile, full_tile_layer)
     
-    copy_tiles_with_prefix(img, sides1_layer, ts_side1, full_tile_layer, full_tile, ["itl", "ibr", "rot", "rol"])
-    copy_tiles_with_prefix(img, sides2_layer, ts_side2, full_tile_layer, full_tile, ["itr", "ibl", "ror", "rob"])
-    synth_tileset(img, full_tile_layer, source, mask, filter_tileset(full_tile, ["full"]))
+    copy_tiles_with_prefix(img, oc_layer, ts_oc, full_tile_layer, full_tile, ["rol", "rot", "rob", "ror"])
+    copy_tiles_with_prefix(img, sides1_layer, ts_side1, full_tile_layer, full_tile, ["itl", "ibr" ])
+    copy_tiles_with_prefix(img, sides2_layer, ts_side2, full_tile_layer, full_tile, ["itr", "ibl" ])
+    synth_tileset(img, full_tile_layer, source, mask, filter_tileset(full_tile, ["full"]), surrounds=1)
 
     #----------------------------------------Inside Corners----------------------------------------
     ic_layer = gimp.Layer(img, "InsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
@@ -311,7 +312,7 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["itl", "ibr"])
     copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["itr", "ibl"])
     copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["full"])
-    synth_tileset(img, ic_layer, source, mask, filter_tileset(ts_inside, ["ril", "rir", "rit", "rib"]), surrounds=5)
+    synth_tileset(img, ic_layer, source, mask, filter_tileset(ts_inside, ["ril", "rir", "rit", "rib"]), surrounds=1)
 
     #---------------------------------------- Check tiling ----------------------------------------
     check_layer = gimp.Layer(img, "Check Tiling", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
