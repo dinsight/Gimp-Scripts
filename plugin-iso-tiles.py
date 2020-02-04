@@ -4,6 +4,7 @@ import gimpenums
 import collections
 import math
 import re
+import os
 
 gettext.install("resynthesizer", gimp.locale_directory, unicode=True)
 Tile = collections.namedtuple("Tile",["inset_type", "x_index", "y_index", "show"])
@@ -266,7 +267,38 @@ def python_iso_select_tiles(image, drawable, x, y, tileSize=128):
     global settings 
     settings = get_settings(tileSize)
     select_tile(image, Tile(BLANK, x, y, True))
-
+#----------------------------------------------------------------------
+#
+#----------------------------------------------------------------------
+def python_iso_export_transitions(image, background, output_path, tileSize=128):
+    global settings 
+    settings = get_settings(tileSize)
+    def get_layer(name):
+      for l in image.layers:
+        if l.name.startswith(name):
+          return l
+      return None
+    layer = get_layer("Check Tiling")
+    image.active_layer = layer
+    exp_list = { 
+      "rol1", "ror1", "rot1", "rob1", "rit1", "rib1", 
+      "ril1", "rir1", "itl1", "itr1", "ibl1", "ibr1", "full1"
+    }
+    for name in exp_list:
+      select_tile(image, Tile(BLANK, check_tiles[name].x_index, check_tiles[name].y_index, True))
+      pdb.gimp_selection_grow(image, 1)
+      pdb.gimp_edit_copy(layer)
+      fsel = pdb.gimp_edit_paste(layer, False)
+      new = pdb.gimp_floating_sel_to_layer(fsel)
+      theNewLayer = image.active_layer
+      fullpath = os.path.join(output_path, name) + ".png"
+      pdb.gimp_file_save(image, background, fullpath, name)
+      pdb.gimp_file_save(image, theNewLayer, fullpath, name)
+      image.remove_layer(theNewLayer)
+      image.active_layer = layer
+#----------------------------------------------------------------------
+#
+#----------------------------------------------------------------------
 def iso_tiles(image, drawable, source, mask, tileSize=128):
     global settings
     settings = get_settings(tileSize)
@@ -363,6 +395,27 @@ register(
   ],
   [],
   python_iso_select_tiles,
+  menu="<Image>/Filters/Tiles",
+  domain=("resynthesizer", gimp.locale_directory)
+  )
+
+register(
+  "python_iso_export_transitions",
+  N_("Export Tiles"),
+  "Requires separate resynthesizer plugin.",
+  "Alex Cotoman",
+  "2020 Alex Cotoman",  # Copyright 
+  "2020",
+  N_("_Export tiles..."),
+  "RGB*, GRAY*",
+  [
+    (PF_IMAGE, "image", "Input image", None),
+    (PF_DRAWABLE, "background", "Tile background", None),
+    (PF_DIRNAME, "output_path", _("Output Path"), os.getcwd()),
+    (PF_INT, "tileSize", _("Tile width (pixels):"), 128),
+  ],
+  [],
+  python_iso_export_transitions,
   menu="<Image>/Filters/Tiles",
   domain=("resynthesizer", gimp.locale_directory)
   )
