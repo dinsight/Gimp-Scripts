@@ -270,9 +270,16 @@ def python_iso_select_tiles(image, drawable, x, y, tileSize=128):
 #----------------------------------------------------------------------
 #
 #----------------------------------------------------------------------
-def python_iso_export_transitions(image, background, output_path, tileSize=128):
+def python_iso_export_transitions(image, output_path, tileSize=128, background=None):
     global settings 
     settings = get_settings(tileSize)
+    def merge_layers(layer1, layer2):
+      for L in image.layers: 
+        if L == layer1 or L == layer2: 
+          pdb.gimp_drawable_set_visible(L, True) 
+        else:
+          pdb.gimp_drawable_set_visible(L, False) 
+      return pdb.gimp_image_merge_visible_layers(image, 0)
     def get_layer(name):
       for l in image.layers:
         if l.name.startswith(name):
@@ -285,17 +292,30 @@ def python_iso_export_transitions(image, background, output_path, tileSize=128):
       "ril1", "rir1", "itl1", "itr1", "ibl1", "ibr1", "full1"
     }
     for name in exp_list:
+      bk_layer = None
       select_tile(image, Tile(BLANK, check_tiles[name].x_index, check_tiles[name].y_index, True))
       pdb.gimp_selection_grow(image, 1)
       pdb.gimp_edit_copy(layer)
       fsel = pdb.gimp_edit_paste(layer, False)
       new = pdb.gimp_floating_sel_to_layer(fsel)
       theNewLayer = image.active_layer
+
+      if background is not None:
+        select_tile(image, Tile(BLANK, check_tiles[name].x_index, check_tiles[name].y_index, True))
+        pdb.gimp_selection_layer_alpha(background)
+        pdb.gimp_edit_copy(background)
+        fsel = pdb.gimp_edit_paste(layer, True)
+        pdb.gimp_floating_sel_to_layer(fsel)
+        bk_layer = image.active_layer
+        
+      if bk_layer is not None:
+        theNewLayer = merge_layers(bk_layer, theNewLayer)
+      
       fullpath = os.path.join(output_path, name) + ".png"
-      pdb.gimp_file_save(image, background, fullpath, name)
       pdb.gimp_file_save(image, theNewLayer, fullpath, name)
       image.remove_layer(theNewLayer)
       image.active_layer = layer
+
 #----------------------------------------------------------------------
 #
 #----------------------------------------------------------------------
@@ -410,9 +430,9 @@ register(
   "RGB*, GRAY*",
   [
     (PF_IMAGE, "image", "Input image", None),
-    (PF_DRAWABLE, "background", "Tile background", None),
     (PF_DIRNAME, "output_path", _("Output Path"), os.getcwd()),
     (PF_INT, "tileSize", _("Tile width (pixels):"), 128),
+    (PF_DRAWABLE, "background", _("Tile background"), None),
   ],
   [],
   python_iso_export_transitions,
