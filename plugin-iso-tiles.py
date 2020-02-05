@@ -179,7 +179,7 @@ def select_tile(img, tile):
       ellipsis_h = 2*(inset_size) * pct_h
       (x,y) = (selection[x_index]-ellipsis_w/2+off_x, selection[y_index]-ellipsis_h/2+off_y)
       pdb.gimp_image_select_ellipse(img, op, x, y, ellipsis_w, ellipsis_h)      
-    def cut_poly( vec1_index, vec2_index ):
+    def cut_poly( vec1_index, vec2_index, grow_sel=0 ):
       start1 = get_sel_value(vec1_index[0])
       end1   = get_sel_value(vec1_index[1])
       start2 = get_sel_value(vec2_index[0])
@@ -190,9 +190,10 @@ def select_tile(img, tile):
       add_to_sel(vec1_index[0], (dx1, dy1))
       add_to_sel(vec2_index[0], (dx2, dy2))
       pdb.gimp_image_select_polygon(img, gimpenums.CHANNEL_OP_REPLACE,len(selection),selection)
+      pdb.gimp_selection_grow(img, grow_sel)
 
-    if tile.inset_type & ROUND_INSIDE_LEFT>0:    cut_ellipse_inside (0)
-    if tile.inset_type & ROUND_INSIDE_RIGHT>0:   cut_ellipse_inside (2)
+    if tile.inset_type & ROUND_INSIDE_LEFT>0:    cut_ellipse_inside (0, 1.46, 0.57,  off_x=-2, off_y=2)
+    if tile.inset_type & ROUND_INSIDE_RIGHT>0:   cut_ellipse_inside (2, 1.46, 0.55,  off_x=1, off_y=1)
     if tile.inset_type & ROUND_INSIDE_TOP>0:     cut_ellipse_inside (1, 1.20, 0.65,  off_x=1, off_y=1)
     if tile.inset_type & ROUND_INSIDE_BOTTOM>0:  cut_ellipse_inside (3, 1.20, 0.65,  off_x=1, off_y=1)
     if tile.inset_type & ROUND_OUTSIDE_RIGHT>0:  cut_ellipse_outside(0, 1.42, 0.57,  op=gimpenums.CHANNEL_OP_INTERSECT, off_x=1, off_y=1)
@@ -201,8 +202,8 @@ def select_tile(img, tile):
     if tile.inset_type & ROUND_OUTSIDE_TOP>0:    cut_ellipse_outside(3, 1.51, 0.55,  op=gimpenums.CHANNEL_OP_INTERSECT)
     if tile.inset_type & INSET_TOP_LEFT>0:       cut_poly((0, 3), (1, 2))
     if tile.inset_type & INSET_TOP_RIGHT>0:      cut_poly((1, 0), (2, 3))
-    if tile.inset_type & INSET_BOTTOM_LEFT>0:    cut_poly((0, 1), (3, 2))
-    if tile.inset_type & INSET_BOTTOM_RIGHT>0:   cut_poly((3, 0), (2, 1))
+    if tile.inset_type & INSET_BOTTOM_LEFT>0:    cut_poly((0, 1), (3, 2), grow_sel=1)
+    if tile.inset_type & INSET_BOTTOM_RIGHT>0:   cut_poly((3, 0), (2, 1), grow_sel=1)
     
 def copy_tile(img, srcLayer, src_tile, destLayer, dest_tile):
   antialias = pdb.gimp_context_get_antialias()
