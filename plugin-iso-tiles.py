@@ -141,7 +141,7 @@ settings = None
 def get_settings(tileSize):
     w = tileSize
     h = tileSize/2
-    settings = Settings(w, h, 41.0, 0.5, 0.12, 30, 200)
+    settings = Settings(w, h, 41.0, 0.4, 0.12, 30, 200)
     return settings
 def filter_tileset(tile_set, arr_names):
     res = []
@@ -325,52 +325,47 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     settings = get_settings(tileSize)
     
     img = gimp.Image(8*settings.width,8*settings.height,gimpenums.RGB)
-    oc_layer = gimp.Layer(img, "OutsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
-    img.add_layer(oc_layer)
+    
 
     #----------------------------------------Outside Corners----------------------------------------
+    oc_layer = gimp.Layer(img, "OutsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+    img.add_layer(oc_layer)
     place_tiles(img, ts_oc, oc_layer)
     synth_tileset(img, oc_layer, source, mask)
-
+    #----------------------------------------Side1----------------------------------------
     sides1_layer = gimp.Layer(img, "Sides1", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(sides1_layer)
-
-    #----------------------------------------Side1----------------------------------------
-    place_tiles(img, ts_side1, sides1_layer)
     copy_tiles_with_prefix(img, oc_layer, ts_oc, sides1_layer, ts_side1, ["rol", "rot", "rob", "ror"])
+    place_tiles(img, ts_side1, sides1_layer)
     synth_tileset(img, sides1_layer, source, mask, filter_tileset(ts_side1, ["itl", "ibr"]), surrounds=1)
-
+    #----------------------------------------Side2----------------------------------------
     sides2_layer = gimp.Layer(img, "Sides2", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(sides2_layer)
-
-    #----------------------------------------Side2----------------------------------------
-    place_tiles(img, ts_side2, sides2_layer)
     copy_tiles_with_prefix(img, oc_layer, ts_oc, sides2_layer, ts_side2, ["rol", "rot", "rob", "ror"])
+    place_tiles(img, ts_side2, sides2_layer)
     synth_tileset(img, sides2_layer, source, mask, filter_tileset(ts_side2, ["itr", "ibl"]), surrounds=1)
 
     #----------------------------------------Full tile----------------------------------------
     full_tile_layer = gimp.Layer(img, "FullTile", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(full_tile_layer)
-    place_tiles(img, full_tile, full_tile_layer)
-    
     copy_tiles_with_prefix(img, oc_layer, ts_oc, full_tile_layer, full_tile, ["rol", "rot", "rob", "ror"])
     copy_tiles_with_prefix(img, sides1_layer, ts_side1, full_tile_layer, full_tile, ["itl", "ibr" ])
     copy_tiles_with_prefix(img, sides2_layer, ts_side2, full_tile_layer, full_tile, ["itr", "ibl" ])
+    place_tiles(img, full_tile, full_tile_layer)
     synth_tileset(img, full_tile_layer, source, mask, filter_tileset(full_tile, ["full"]), surrounds=1)
 
     #----------------------------------------Inside Corners----------------------------------------
     ic_layer = gimp.Layer(img, "InsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(ic_layer)
-    place_tiles(img, ts_inside, ic_layer)
     copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["itl", "ibr"])
     copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["itr", "ibl"])
     copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["full"])
+    place_tiles(img, ts_inside, ic_layer)
     synth_tileset(img, ic_layer, source, mask, filter_tileset(ts_inside, ["ril", "rir", "rit", "rib"]), surrounds=1)
 
     #---------------------------------------- Check tiling ----------------------------------------
     check_layer = gimp.Layer(img, "Check Tiling", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(check_layer)
-
     copy_tiles_with_prefix(img, full_tile_layer, full_tile, check_layer, check_tiles, ["itl","itr","ibl","ibr","rol","ror","rot","rob","full"])
     copy_tiles_with_prefix(img, ic_layer, ts_inside, check_layer, check_tiles, ["ril","rir","rit","rib"])
 
