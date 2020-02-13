@@ -149,6 +149,11 @@ def get_settings(tileSize):
     w = tileSize
     settings = Settings(w, 41.0, 0.5, 0.12, 30, 200)
     return settings
+def to_iso_tile(img, layer):
+  item = pdb.gimp_item_transform_rotate(layer, math.pi/4, True, 0, 0)
+  dw = settings.width * 2
+  dh = settings.width
+  return pdb.gimp_item_transform_scale(item, 0, 0, dw, dh)
 def filter_tileset(tile_set, arr_names):
     res = []
     for key, value in tile_set.items():
@@ -163,7 +168,6 @@ def select_tile(img, tile):
     h = w = settings.width
     inset_size = settings.inset
     (dx, dy) = (tile.x_index * w, tile.y_index * h)
-    #selection = select_diamond_shape(img, w, h, dx, dy)
     def select_circle(cx,cy,cr, op=gimpenums.CHANNEL_OP_REPLACE):
       (x,y) = (cx-cr, cy-cr)
       pdb.gimp_image_select_ellipse(img, op, x, y, 2*cr ,2*cr )
@@ -246,7 +250,11 @@ def synth_tileset(img, layer, source, mask, arr_tiles=None, surrounds=3):
 def python_iso_select_tiles(image, drawable, x, y, tileSize=128):
     global settings 
     settings = get_settings(tileSize)
-    select_tile(image, Tile(BLANK, x, y, True))
+    w = settings.width
+    h = w/2
+    #select_tile(image, Tile(BLANK, x, y, True))
+    (dx, dy) = (dx, dy) = (x * w/2, y * h/2)
+    select_diamond_shape(image, w, h, dx, dy)
 #----------------------------------------------------------------------
 #
 #----------------------------------------------------------------------
@@ -277,16 +285,17 @@ def python_iso_export_transitions(image, output_path, tileSize=128, background=N
       pdb.gimp_selection_grow(image, 1)
       pdb.gimp_edit_copy(layer)
       fsel = pdb.gimp_edit_paste(layer, False)
-      new = pdb.gimp_floating_sel_to_layer(fsel)
+      trns = to_iso_tile(image, fsel)
+      new = pdb.gimp_floating_sel_to_layer(trns)
       theNewLayer = image.active_layer
 
-      if background is not None:
-        select_tile(image, Tile(BLANK, check_tiles[name].x_index, check_tiles[name].y_index, True))
-        pdb.gimp_selection_layer_alpha(background)
-        pdb.gimp_edit_copy(background)
-        fsel = pdb.gimp_edit_paste(layer, True)
-        pdb.gimp_floating_sel_to_layer(fsel)
-        bk_layer = image.active_layer
+      # if background is not None:
+      #   select_tile(image, Tile(BLANK, check_tiles[name].x_index, check_tiles[name].y_index, True))
+      #   pdb.gimp_selection_layer_alpha(background)
+      #   pdb.gimp_edit_copy(background)
+      #   fsel = pdb.gimp_edit_paste(layer, True)
+      #   pdb.gimp_floating_sel_to_layer(fsel)
+      #   bk_layer = image.active_layer
         
       if bk_layer is not None:
         theNewLayer = merge_layers(bk_layer, theNewLayer)
@@ -304,8 +313,6 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     settings = get_settings(tileSize)
     
     img = gimp.Image(8*settings.width,9*settings.width,gimpenums.RGB)
-    
-
     #----------------------------------------Outside Corners----------------------------------------
     oc_layer = gimp.Layer(img, "OutsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(oc_layer)
@@ -348,6 +355,7 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     copy_tiles_with_prefix(img, full_tile_layer, full_tile, check_layer, check_tiles, ["itl","itr","ibl","ibr","rol","ror","rot","rob","full"])
     copy_tiles_with_prefix(img, ic_layer, ts_inside, check_layer, check_tiles, ["ril","rir","rit","rib"])
     #place_tiles(img, check_tiles, check_layer, True)
+    #to_iso(img, check_layer)
 
     d = gimp.Display(img)
 
