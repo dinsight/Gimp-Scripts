@@ -164,7 +164,7 @@ def select_diamond_shape(img, w, h, dx, dy):
     selection = [0+dx, h/2+dy, w/2+dx, dy, w+dx, h/2+dy, w/2+dx, h+dy]
     pdb.gimp_image_select_polygon(img, gimpenums.CHANNEL_OP_REPLACE,len(selection),selection)
     return selection
-def select_tile(img, tile):
+def select_tile(img, tile, select_full=False):
     h = w = settings.width
     inset_size = settings.inset
     (dx, dy) = (tile.x_index * w, tile.y_index * h)
@@ -173,19 +173,20 @@ def select_tile(img, tile):
       pdb.gimp_image_select_ellipse(img, op, x, y, 2*cr ,2*cr )
 
     selection = pdb.gimp_image_select_rectangle (img, gimpenums.CHANNEL_OP_REPLACE, dx, dy, w ,w)
-    if tile.inset_type & ROUND_OUTSIDE_LEFT>0:    select_circle(dx+w, dy, inset_size, gimpenums.CHANNEL_OP_INTERSECT)
-    if tile.inset_type & ROUND_OUTSIDE_RIGHT>0:   select_circle(dx, dy+h, inset_size, gimpenums.CHANNEL_OP_INTERSECT)
-    if tile.inset_type & ROUND_OUTSIDE_BOTTOM>0:  select_circle(dx, dy, inset_size, gimpenums.CHANNEL_OP_INTERSECT)
-    if tile.inset_type & ROUND_OUTSIDE_TOP>0:     select_circle(dx+w, dy+h, inset_size, gimpenums.CHANNEL_OP_INTERSECT)
-    if tile.inset_type & ROUND_INSIDE_TOP>0:      select_circle(dx, dy, w-inset_size, gimpenums.CHANNEL_OP_SUBTRACT)
-    if tile.inset_type & ROUND_INSIDE_RIGHT>0:    select_circle(dx+w, dy, w-inset_size, gimpenums.CHANNEL_OP_SUBTRACT)
-    if tile.inset_type & ROUND_INSIDE_BOTTOM>0:   select_circle(dx+w, dy+h, w-inset_size, gimpenums.CHANNEL_OP_SUBTRACT)
-    if tile.inset_type & ROUND_INSIDE_LEFT>0:     select_circle(dx, dy+h, w-inset_size, gimpenums.CHANNEL_OP_SUBTRACT)
-    if tile.inset_type & INSET_TOP_LEFT>0:        pdb.gimp_image_select_rectangle(img, gimpenums.CHANNEL_OP_SUBTRACT, dx, dy, w-inset_size , h )
-    if tile.inset_type & INSET_TOP_RIGHT>0:       pdb.gimp_image_select_rectangle(img, gimpenums.CHANNEL_OP_SUBTRACT, dx, dy, w, h-inset_size )
-    if tile.inset_type & INSET_BOTTOM_RIGHT>0:    pdb.gimp_image_select_rectangle(img, gimpenums.CHANNEL_OP_SUBTRACT, dx+inset_size, dy, w-inset_size, h )
-    if tile.inset_type & INSET_BOTTOM_LEFT>0:     pdb.gimp_image_select_rectangle(img, gimpenums.CHANNEL_OP_SUBTRACT, dx, dy+inset_size, w, h-inset_size )
-      
+    if not select_full:
+      if tile.inset_type & ROUND_OUTSIDE_LEFT>0:    select_circle(dx+w, dy, inset_size, gimpenums.CHANNEL_OP_INTERSECT)
+      if tile.inset_type & ROUND_OUTSIDE_RIGHT>0:   select_circle(dx, dy+h, inset_size, gimpenums.CHANNEL_OP_INTERSECT)
+      if tile.inset_type & ROUND_OUTSIDE_BOTTOM>0:  select_circle(dx, dy, inset_size, gimpenums.CHANNEL_OP_INTERSECT)
+      if tile.inset_type & ROUND_OUTSIDE_TOP>0:     select_circle(dx+w, dy+h, inset_size, gimpenums.CHANNEL_OP_INTERSECT)
+      if tile.inset_type & ROUND_INSIDE_TOP>0:      select_circle(dx, dy, w-inset_size, gimpenums.CHANNEL_OP_SUBTRACT)
+      if tile.inset_type & ROUND_INSIDE_RIGHT>0:    select_circle(dx+w, dy, w-inset_size, gimpenums.CHANNEL_OP_SUBTRACT)
+      if tile.inset_type & ROUND_INSIDE_BOTTOM>0:   select_circle(dx+w, dy+h, w-inset_size, gimpenums.CHANNEL_OP_SUBTRACT)
+      if tile.inset_type & ROUND_INSIDE_LEFT>0:     select_circle(dx, dy+h, w-inset_size, gimpenums.CHANNEL_OP_SUBTRACT)
+      if tile.inset_type & INSET_TOP_LEFT>0:        pdb.gimp_image_select_rectangle(img, gimpenums.CHANNEL_OP_SUBTRACT, dx, dy, w-inset_size , h )
+      if tile.inset_type & INSET_TOP_RIGHT>0:       pdb.gimp_image_select_rectangle(img, gimpenums.CHANNEL_OP_SUBTRACT, dx, dy, w, h-inset_size )
+      if tile.inset_type & INSET_BOTTOM_RIGHT>0:    pdb.gimp_image_select_rectangle(img, gimpenums.CHANNEL_OP_SUBTRACT, dx+inset_size, dy, w-inset_size, h )
+      if tile.inset_type & INSET_BOTTOM_LEFT>0:     pdb.gimp_image_select_rectangle(img, gimpenums.CHANNEL_OP_SUBTRACT, dx, dy+inset_size, w, h-inset_size )
+        
 
 def copy_tile(img, srcLayer, src_tile, destLayer, dest_tile):
   antialias = pdb.gimp_context_get_antialias()
@@ -223,7 +224,7 @@ def synth_tileset(img, layer, source, mask, arr_tiles=None, surrounds=3):
   else:
     sel_channels = []
     for item in arr_tiles:
-      select_tile(img, item)
+      select_tile(img, item, True)
       sel_channels.append(pdb.gimp_selection_save(img))
     pdb.gimp_selection_clear(img)
     for s in sel_channels:
@@ -317,7 +318,7 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     oc_layer = gimp.Layer(img, "OutsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(oc_layer)
     place_tiles(img, ts_oc, oc_layer)
-    synth_tileset(img, oc_layer, source, mask)
+    synth_tileset(img, oc_layer, source, mask, surrounds=4)
     #----------------------------------------Side1----------------------------------------
     sides1_layer = gimp.Layer(img, "Sides1", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(sides1_layer)
@@ -354,9 +355,8 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     img.add_layer(check_layer)
     copy_tiles_with_prefix(img, full_tile_layer, full_tile, check_layer, check_tiles, ["itl","itr","ibl","ibr","rol","ror","rot","rob","full"])
     copy_tiles_with_prefix(img, ic_layer, ts_inside, check_layer, check_tiles, ["ril","rir","rit","rib"])
-    #place_tiles(img, check_tiles, check_layer, True)
-    #to_iso(img, check_layer)
-
+    # place_tiles(img, check_tiles, check_layer, True)
+    
     d = gimp.Display(img)
 
 register(
