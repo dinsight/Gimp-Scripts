@@ -188,24 +188,33 @@ def select_tile(img, tile, select_full=False):
       if tile.inset_type & INSET_BOTTOM_LEFT>0:     pdb.gimp_image_select_rectangle(img, gimpenums.CHANNEL_OP_SUBTRACT, dx, dy+inset_size, w, h-inset_size )
         
 
-def copy_tile(img, srcLayer, src_tile, destLayer, dest_tile):
+def copy_tile(img, srcLayer, src_tile, destLayer, dest_tile, to_iso=False):
   antialias = pdb.gimp_context_get_antialias()
   pdb.gimp_context_set_antialias(False)
   select_tile(img, src_tile)
   pdb.gimp_edit_copy(srcLayer)
   select_tile(img, dest_tile)
   fsel = pdb.gimp_edit_paste(destLayer, False)
+  if to_iso:
+    w = settings.width
+    (dx, dy) = (dest_tile.x_index * w, dest_tile.y_index * w)
+    fsel = to_iso_tile(img, fsel)
+    isox = dx
+    isoy = dy
+    pdb.gimp_message('dx={}, dy={}, isox={}, isoy={}'.format(dx, dy, isox, -isoy))
+    pdb.gimp_layer_translate(fsel, isox, isoy)
+    
   pdb.gimp_floating_sel_anchor(fsel)
   pdb.gimp_context_set_antialias(antialias)
 
-def copy_tiles_with_prefix(img, srcLayer, src_tile, destLayer, dest_tile, prefixes=[]):
+def copy_tiles_with_prefix(img, srcLayer, src_tile, destLayer, dest_tile, prefixes=[], to_iso=False):
   def remove_digits(name): 
     pattern = '[0-9]'
     return re.sub(pattern, '', name)
   for dest_key in dest_tile.keys():
     key = remove_digits(dest_key)
     if key in src_tile and key in prefixes:
-      copy_tile(img, srcLayer, src_tile[key], destLayer, dest_tile[dest_key])
+      copy_tile(img, srcLayer, src_tile[key], destLayer, dest_tile[dest_key], to_iso)
 
 def place_tiles(img, ts, layer, showall=False, grow=0):
   antialias = pdb.gimp_context_get_antialias()
@@ -353,8 +362,8 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     #---------------------------------------- Check tiling ----------------------------------------
     check_layer = gimp.Layer(img, "Check Tiling", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(check_layer)
-    copy_tiles_with_prefix(img, full_tile_layer, full_tile, check_layer, check_tiles, ["itl","itr","ibl","ibr","rol","ror","rot","rob","full"])
-    copy_tiles_with_prefix(img, ic_layer, ts_inside, check_layer, check_tiles, ["ril","rir","rit","rib"])
+    copy_tiles_with_prefix(img, full_tile_layer, full_tile, check_layer, check_tiles, ["itl","itr","ibl","ibr","rol","ror","rot","rob","full"], True)
+    copy_tiles_with_prefix(img, ic_layer, ts_inside, check_layer, check_tiles, ["ril","rir","rit","rib"], True)
     # place_tiles(img, check_tiles, check_layer, True)
     
     d = gimp.Display(img)
