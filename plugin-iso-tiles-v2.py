@@ -149,11 +149,11 @@ def get_settings(tileSize):
     w = tileSize
     settings = Settings(w, 41.0, 0.5, 0.12, 30, 200)
     return settings
-def to_iso_tile(img, layer):
+def to_iso_tile(img, layer, grow=0):
   item = pdb.gimp_item_transform_rotate(layer, math.pi/4, True, 0, 0)
   dw = settings.width * 2
   dh = settings.width
-  return pdb.gimp_item_transform_scale(item, 0, 0, dw, dh)
+  return pdb.gimp_item_transform_scale(item, 0, 0, dw+2*grow, dh+2*grow)
 def filter_tileset(tile_set, arr_names):
     res = []
     for key, value in tile_set.items():
@@ -196,12 +196,15 @@ def copy_tile(img, srcLayer, src_tile, destLayer, dest_tile, to_iso=False):
     w = settings.width
     (dx, dy) = (dest_tile.x_index , dest_tile.y_index )
     select_tile(img, src_tile, True)
+    grow = 1
+    pdb.gimp_selection_grow(img, grow)
     pdb.gimp_edit_copy(srcLayer)
     select_tile(img, dest_tile, True)
+    pdb.gimp_selection_grow(img, grow)
     fsel = pdb.gimp_edit_paste(destLayer, False)
-    fsel = to_iso_tile(img, fsel)
-    isox = (dx - dy) *w + img.width/2.0
-    isoy = (dx + dy) *w/2.0
+    fsel = to_iso_tile(img, fsel, grow)
+    isox = (dx - dy) *w + img.width/2.0 + grow
+    isoy = (dx + dy) *w/2.0 + grow
     pdb.gimp_message('dx={}, dy={}, isox={}, isoy={}'.format(dx, dy, isox, -isoy))
     pdb.gimp_layer_translate(fsel, isox, isoy)
     pdb.gimp_floating_sel_anchor(fsel)
@@ -367,7 +370,7 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     synth_tileset(img, ic_layer, source, mask, filter_tileset(ts_inside, ["ril", "rir", "rit", "rib"]), surrounds=1)
 
     #---------------------------------------- Check tiling ----------------------------------------
-    check_layer = gimp.Layer(img, "Check Tiling", img.width*2,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+    check_layer = gimp.Layer(img, "Check Tiling", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(check_layer)
     copy_tiles_with_prefix(img, full_tile_layer, full_tile, check_layer, check_tiles, ["itl","itr","ibl","ibr","rol","ror","rot","rob","full"], True)
     copy_tiles_with_prefix(img, ic_layer, ts_inside, check_layer, check_tiles, ["ril","rir","rit","rib"], True)
