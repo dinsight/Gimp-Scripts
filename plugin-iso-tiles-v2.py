@@ -191,20 +191,27 @@ def select_tile(img, tile, select_full=False):
 def copy_tile(img, srcLayer, src_tile, destLayer, dest_tile, to_iso=False):
   antialias = pdb.gimp_context_get_antialias()
   pdb.gimp_context_set_antialias(False)
-  select_tile(img, src_tile)
-  pdb.gimp_edit_copy(srcLayer)
-  select_tile(img, dest_tile)
-  fsel = pdb.gimp_edit_paste(destLayer, False)
+  
   if to_iso:
     w = settings.width
-    (dx, dy) = (dest_tile.x_index * w, dest_tile.y_index * w)
+    (dx, dy) = (dest_tile.x_index , dest_tile.y_index )
+    select_tile(img, src_tile, True)
+    pdb.gimp_edit_copy(srcLayer)
+    select_tile(img, dest_tile, True)
+    fsel = pdb.gimp_edit_paste(destLayer, False)
     fsel = to_iso_tile(img, fsel)
-    isox = dx
-    isoy = dy
+    isox = (dx - dy) *w + img.width/2.0
+    isoy = (dx + dy) *w/2.0
     pdb.gimp_message('dx={}, dy={}, isox={}, isoy={}'.format(dx, dy, isox, -isoy))
     pdb.gimp_layer_translate(fsel, isox, isoy)
-    
-  pdb.gimp_floating_sel_anchor(fsel)
+    pdb.gimp_floating_sel_anchor(fsel)
+  else:
+    select_tile(img, src_tile)
+    pdb.gimp_edit_copy(srcLayer)
+    select_tile(img, dest_tile)
+    fsel = pdb.gimp_edit_paste(destLayer, False)
+    pdb.gimp_floating_sel_anchor(fsel)
+  
   pdb.gimp_context_set_antialias(antialias)
 
 def copy_tiles_with_prefix(img, srcLayer, src_tile, destLayer, dest_tile, prefixes=[], to_iso=False):
@@ -322,7 +329,7 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     global settings
     settings = get_settings(tileSize)
     
-    img = gimp.Image(8*settings.width,9*settings.width,gimpenums.RGB)
+    img = gimp.Image(8*settings.width*2,9*settings.width,gimpenums.RGB)
     #----------------------------------------Outside Corners----------------------------------------
     oc_layer = gimp.Layer(img, "OutsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(oc_layer)
@@ -360,7 +367,7 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     synth_tileset(img, ic_layer, source, mask, filter_tileset(ts_inside, ["ril", "rir", "rit", "rib"]), surrounds=1)
 
     #---------------------------------------- Check tiling ----------------------------------------
-    check_layer = gimp.Layer(img, "Check Tiling", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+    check_layer = gimp.Layer(img, "Check Tiling", img.width*2,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(check_layer)
     copy_tiles_with_prefix(img, full_tile_layer, full_tile, check_layer, check_tiles, ["itl","itr","ibl","ibr","rol","ror","rot","rob","full"], True)
     copy_tiles_with_prefix(img, ic_layer, ts_inside, check_layer, check_tiles, ["ril","rir","rit","rib"], True)
