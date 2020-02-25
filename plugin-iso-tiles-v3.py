@@ -150,6 +150,7 @@ def get_settings(tileSize):
     settings = Settings(w, 41.0, 0.5, 0.12, 30, 200)
     return settings
 def to_iso_tile(img, layer, grow=0):
+  pdb.gimp_context_set_interpolation(gimpenums.INTERPOLATION_NONE)
   item = pdb.gimp_item_transform_rotate(layer, math.pi/4, True, 0, 0)
   dw = settings.width * 2
   dh = settings.width
@@ -166,7 +167,7 @@ def select_diamond_shape(img, w, h, dx, dy):
     return selection
 def select_tile(img, tile, select_full=False):
     h = w = settings.width
-    inset_size = settings.inset
+    inset_size = settings.inset  
     (dx, dy) = (tile.x_index * w, tile.y_index * h)
     def select_circle(cx,cy,cr, op=gimpenums.CHANNEL_OP_REPLACE):
       (x,y) = (cx-cr, cy-cr)
@@ -187,26 +188,28 @@ def select_tile(img, tile, select_full=False):
       if tile.inset_type & INSET_BOTTOM_RIGHT>0:    pdb.gimp_image_select_rectangle(img, gimpenums.CHANNEL_OP_SUBTRACT, dx+inset_size, dy, w-inset_size, h )
       if tile.inset_type & INSET_BOTTOM_LEFT>0:     pdb.gimp_image_select_rectangle(img, gimpenums.CHANNEL_OP_SUBTRACT, dx, dy+inset_size, w, h-inset_size )
         
-def copy_tile(img, srcLayer, src_tile, destLayer, dest_tile):
+def copy_tile(img, srcLayer, src_tile, destLayer, dest_tile, grow=0):
   antialias = pdb.gimp_context_get_antialias()
   pdb.gimp_context_set_antialias(False)
   
   python_iso_select_tiles(img, srcLayer, src_tile.x_index, src_tile.y_index)
+  if grow > 0 : pdb.gimp_selection_grow(img, grow)
   pdb.gimp_edit_copy(srcLayer)
   python_iso_select_tiles(img, destLayer, dest_tile.x_index, dest_tile.y_index)
+  if grow > 0 : pdb.gimp_selection_grow(img, grow)
   fsel = pdb.gimp_edit_paste(destLayer, False)
   pdb.gimp_floating_sel_anchor(fsel)
 
   pdb.gimp_context_set_antialias(antialias)
 
-def copy_tiles_with_prefix(img, srcLayer, src_tile, destLayer, dest_tile, prefixes=[]):
+def copy_tiles_with_prefix(img, srcLayer, src_tile, destLayer, dest_tile, prefixes=[], grow=0):
   def remove_digits(name): 
     pattern = '[0-9]'
     return re.sub(pattern, '', name)
   for dest_key in dest_tile.keys():
     key = remove_digits(dest_key)
     if key in src_tile and key in prefixes:
-      copy_tile(img, srcLayer, src_tile[key], destLayer, dest_tile[dest_key])
+      copy_tile(img, srcLayer, src_tile[key], destLayer, dest_tile[dest_key], grow)
 
 def place_tiles(img, ts, layer, showall=False, grow=0):
   antialias = pdb.gimp_context_get_antialias()
@@ -216,12 +219,14 @@ def place_tiles(img, ts, layer, showall=False, grow=0):
       w = settings.width
       (dx, dy) = (tile.x_index , tile.y_index )
       select_tile(img, tile)
+      pdb.gimp_selection_sharpen(img)
       if grow > 0 : pdb.gimp_selection_grow(img, grow)
 
       tmp_layer = gimp.Layer(img, "tmp", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
       img.add_layer(tmp_layer)
       pdb.gimp_edit_fill(tmp_layer, gimpenums.FOREGROUND_FILL)
       select_tile(img, tile, True)
+      pdb.gimp_selection_sharpen(img)
         
       pdb.gimp_edit_copy(tmp_layer)
       fsel = pdb.gimp_edit_paste(layer, False)
@@ -336,22 +341,22 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     #----------------------------------------Outside Corners----------------------------------------
     oc_layer = gimp.Layer(img, "OutsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(oc_layer)
-    place_tiles(img, ts_oc, oc_layer, grow=1)
-    synth_tileset(img, oc_layer, source, mask, surrounds=4)
+    place_tiles(img, ts_oc, oc_layer, grow=0)
+    synth_tileset(img, oc_layer, source, mask, surrounds=3)
     #----------------------------------------Side1----------------------------------------
     sides1_layer = gimp.Layer(img, "Sides1", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(sides1_layer)
-    copy_tiles_with_prefix(img, oc_layer, ts_oc, sides1_layer, ts_side1, ["rol", "rot", "rob", "ror"])
-    place_tiles(img, ts_side1, sides1_layer, grow=1)
+    copy_tiles_with_prefix(img, oc_layer, ts_oc, sides1_layer, ts_side1, ["rol", "rot", "rob", "ror"], grow=0)
+    place_tiles(img, ts_side1, sides1_layer, grow=0)
     synth_tileset(img, sides1_layer, source, mask, filter_tileset(ts_side1, ["itl", "ibr"]), surrounds=0)
-    #----------------------------------------Side2----------------------------------------
+    # #----------------------------------------Side2----------------------------------------
     sides2_layer = gimp.Layer(img, "Sides2", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(sides2_layer)
     copy_tiles_with_prefix(img, oc_layer, ts_oc, sides2_layer, ts_side2, ["rol", "rot", "rob", "ror"])
     place_tiles(img, ts_side2, sides2_layer, grow=1)
     synth_tileset(img, sides2_layer, source, mask, filter_tileset(ts_side2, ["itr", "ibl"]), surrounds=0)
 
-    #----------------------------------------Full tile----------------------------------------
+    # #----------------------------------------Full tile----------------------------------------
     full_tile_layer = gimp.Layer(img, "FullTile", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(full_tile_layer)
     copy_tiles_with_prefix(img, oc_layer, ts_oc, full_tile_layer, full_tile, ["rol", "rot", "rob", "ror"])
@@ -360,21 +365,21 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     place_tiles(img, full_tile, full_tile_layer, grow=1)
     synth_tileset(img, full_tile_layer, source, mask, filter_tileset(full_tile, ["full"]), surrounds=0)
     
-    #----------------------------------------Inside Corners----------------------------------------
-    ic_layer = gimp.Layer(img, "InsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
-    img.add_layer(ic_layer)
-    copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["itl", "ibr"])
-    copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["itr", "ibl"])
-    copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["full"])
-    place_tiles(img, ts_inside, ic_layer, grow=1)
-    synth_tileset(img, ic_layer, source, mask, filter_tileset(ts_inside, ["ril", "rir", "rit", "rib"]), surrounds=0)
+    # #----------------------------------------Inside Corners----------------------------------------
+    # ic_layer = gimp.Layer(img, "InsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+    # img.add_layer(ic_layer)
+    # copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["itl", "ibr"])
+    # copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["itr", "ibl"])
+    # copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["full"])
+    # place_tiles(img, ts_inside, ic_layer, grow=1)
+    # synth_tileset(img, ic_layer, source, mask, filter_tileset(ts_inside, ["ril", "rir", "rit", "rib"]), surrounds=0)
 
-    #---------------------------------------- Check tiling ----------------------------------------
-    check_layer = gimp.Layer(img, "Check Tiling", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
-    img.add_layer(check_layer)
-    copy_tiles_with_prefix(img, full_tile_layer, full_tile, check_layer, check_tiles, ["itl","itr","ibl","ibr","rol","ror","rot","rob","full"])
-    copy_tiles_with_prefix(img, ic_layer, ts_inside, check_layer, check_tiles, ["ril","rir","rit","rib"])
-    place_tiles(img, check_tiles, check_layer, True)
+    # #---------------------------------------- Check tiling ----------------------------------------
+    # check_layer = gimp.Layer(img, "Check Tiling", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+    # img.add_layer(check_layer)
+    # copy_tiles_with_prefix(img, full_tile_layer, full_tile, check_layer, check_tiles, ["itl","itr","ibl","ibr","rol","ror","rot","rob","full"])
+    # copy_tiles_with_prefix(img, ic_layer, ts_inside, check_layer, check_tiles, ["ril","rir","rit","rib"])
+    # place_tiles(img, check_tiles, check_layer, True)
     
     d = gimp.Display(img)
 
