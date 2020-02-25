@@ -147,7 +147,7 @@ settings = None
 #----------------------------------------------------------------------
 def get_settings(tileSize):
     w = tileSize
-    settings = Settings(w, 41.0, 0.5, 0.12, 30, 200)
+    settings = Settings(w, 41.0, 0.5, 0.12, 50, 200)
     return settings
 def to_iso_tile(img, layer, grow=0):
   item = pdb.gimp_item_transform_rotate(layer, math.pi/4, True, 0, 0)
@@ -333,6 +333,23 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     settings = get_settings(tileSize)
     
     img = gimp.Image(8*settings.width*2,9*settings.width,gimpenums.RGB)
+    source = pdb.gimp_layer_new_from_drawable(source, img)
+    mask = pdb.gimp_layer_new_from_drawable(mask, img)
+    img.add_layer(source)
+    img.add_layer(mask)
+    
+    source = pdb.gimp_item_transform_rotate(source, -math.pi/4, True, 0, 0)
+    mask = pdb.gimp_item_transform_rotate(mask, -math.pi/4, True, 0, 0)
+    pdb.gimp_layer_set_offsets(source, 0, 0)
+    pdb.gimp_layer_set_offsets(mask, 0, 0)
+    pdb.gimp_layer_resize_to_image_size(source)
+    pdb.gimp_layer_resize_to_image_size(mask)
+    foreground = pdb.gimp_context_get_foreground()
+    pdb.gimp_image_select_color(img, gimpenums.CHANNEL_OP_REPLACE, mask, foreground)
+    pdb.gimp_selection_invert(img)
+    pdb.gimp_edit_fill(mask, gimpenums.BACKGROUND_FILL)
+    pdb.gimp_selection_clear(img)
+
     #----------------------------------------Outside Corners----------------------------------------
     oc_layer = gimp.Layer(img, "OutsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(oc_layer)
@@ -374,7 +391,7 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     img.add_layer(check_layer)
     copy_tiles_with_prefix(img, full_tile_layer, full_tile, check_layer, check_tiles, ["itl","itr","ibl","ibr","rol","ror","rot","rob","full"], True)
     copy_tiles_with_prefix(img, ic_layer, ts_inside, check_layer, check_tiles, ["ril","rir","rit","rib"], True)
-    # place_tiles(img, check_tiles, check_layer, True)
+    place_tiles(img, check_tiles, check_layer, True)
     
     d = gimp.Display(img)
 
