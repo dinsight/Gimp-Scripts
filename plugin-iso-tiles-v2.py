@@ -325,31 +325,40 @@ def python_iso_export_transitions(image, output_path, tileSize=128, background=N
       image.remove_layer(theNewLayer)
       image.active_layer = layer
 
+def prepare_sources(image, drawable, source_layer):
+  img = gimp.Image(settings.width,settings.width,gimpenums.RGB)
+  source = pdb.gimp_layer_new_from_drawable(source_layer, img)
+  img.add_layer(source)
+
+  source = pdb.gimp_item_transform_rotate(source, -math.pi/4, True, 0, 0)
+  source.name = "Source-tmp"
+  pdb.gimp_layer_set_offsets(source, 0, 0)
+
+  pdb.gimp_image_resize_to_layers(img)
+  pdb.gimp_selection_layer_alpha(source)
+  mask = gimp.Layer(img, "Mask-tmp", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+  img.add_layer(mask)
+  
+  pdb.gimp_layer_resize_to_image_size(mask)
+  pdb.gimp_edit_fill(mask, gimpenums.FOREGROUND_FILL)
+  pdb.gimp_selection_invert(img)
+  pdb.gimp_edit_fill(mask, gimpenums.BACKGROUND_FILL)
+  pdb.gimp_selection_clear(img)
+  return (source, mask, img)
+
 #----------------------------------------------------------------------
 #
 #----------------------------------------------------------------------
-def iso_tiles(image, drawable, source, mask, tileSize=128):
+def iso_tiles(image, drawable, source_layer, tileSize=128):
     global settings
     settings = get_settings(tileSize)
     
     img = gimp.Image(8*settings.width*2,9*settings.width,gimpenums.RGB)
-    source = pdb.gimp_layer_new_from_drawable(source, img)
-    mask = pdb.gimp_layer_new_from_drawable(mask, img)
-    img.add_layer(source)
-    img.add_layer(mask)
+    prep = prepare_sources(image, drawable, source_layer)
+    source = prep[0]
+    mask = prep[1]
+    tmpImg = prep[2]
     
-    source = pdb.gimp_item_transform_rotate(source, -math.pi/4, True, 0, 0)
-    mask = pdb.gimp_item_transform_rotate(mask, -math.pi/4, True, 0, 0)
-    pdb.gimp_layer_set_offsets(source, 0, 0)
-    pdb.gimp_layer_set_offsets(mask, 0, 0)
-    pdb.gimp_layer_resize_to_image_size(source)
-    pdb.gimp_layer_resize_to_image_size(mask)
-    foreground = pdb.gimp_context_get_foreground()
-    pdb.gimp_image_select_color(img, gimpenums.CHANNEL_OP_REPLACE, mask, foreground)
-    pdb.gimp_selection_invert(img)
-    pdb.gimp_edit_fill(mask, gimpenums.BACKGROUND_FILL)
-    pdb.gimp_selection_clear(img)
-
     #----------------------------------------Outside Corners----------------------------------------
     oc_layer = gimp.Layer(img, "OutsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(oc_layer)
@@ -377,7 +386,7 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     place_tiles(img, full_tile, full_tile_layer, grow=0)
     synth_tileset(img, full_tile_layer, source, mask, filter_tileset(full_tile, ["full"]), surrounds=0)
     
-    # #----------------------------------------Inside Corners----------------------------------------
+    #----------------------------------------Inside Corners----------------------------------------
     ic_layer = gimp.Layer(img, "InsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(ic_layer)
     copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["itl", "ibr"])
@@ -391,10 +400,10 @@ def iso_tiles(image, drawable, source, mask, tileSize=128):
     img.add_layer(check_layer)
     copy_tiles_with_prefix(img, full_tile_layer, full_tile, check_layer, check_tiles, ["itl","itr","ibl","ibr","rol","ror","rot","rob","full"], True)
     copy_tiles_with_prefix(img, ic_layer, ts_inside, check_layer, check_tiles, ["ril","rir","rit","rib"], True)
-    place_tiles(img, check_tiles, check_layer, True)
     
     d = gimp.Display(img)
-
+    pdb.gimp_image_delete(tmpImg)
+    
 register(
   "python_iso_tiles",
   N_("Create Iso Tiles from pattern"),
@@ -407,8 +416,7 @@ register(
   [
     (PF_IMAGE, "image",       "Input image", None),
     (PF_DRAWABLE, "drawable", "Input drawable", None),
-    (PF_DRAWABLE, "source", "Source image", None),
-    (PF_DRAWABLE, "mask", "Source mask", None),
+    (PF_DRAWABLE, "source_layer", "Source image", None),
     (PF_INT, "tileSize", _("Tile width (pixels):"), 128),
   ],
   [],
