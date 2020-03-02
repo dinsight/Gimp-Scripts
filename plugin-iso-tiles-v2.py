@@ -193,19 +193,19 @@ def copy_tile(img, srcLayer, src_tile, destLayer, dest_tile, to_iso=False):
   pdb.gimp_context_set_antialias(False)
   
   if to_iso:
-    w = settings.width
+    w = h = settings.width
     (dx, dy) = (dest_tile.x_index , dest_tile.y_index )
     select_tile(img, src_tile, True)
-    grow = 1
+    grow = 0
     pdb.gimp_selection_grow(img, grow)
     pdb.gimp_edit_copy(srcLayer)
     select_tile(img, dest_tile, True)
     pdb.gimp_selection_grow(img, grow)
     fsel = pdb.gimp_edit_paste(destLayer, False)
     fsel = to_iso_tile(img, fsel, grow)
-    isox = (dx - dy) *w + img.width/2.0 + grow
-    isoy = (dx + dy) *w/2.0 + grow
-    pdb.gimp_message('dx={}, dy={}, isox={}, isoy={}'.format(dx, dy, isox, -isoy))
+    isox = (dx - dy) *w  + img.width/2.0 + grow
+    isoy = (dx + dy) *h / 2 + grow
+    #pdb.gimp_message('dx={}, dy={}, isox={}, isoy={}'.format(dx, dy, isox, -isoy))
     pdb.gimp_layer_translate(fsel, isox, isoy)
     pdb.gimp_floating_sel_anchor(fsel)
   else:
@@ -267,18 +267,21 @@ def synth_tileset(img, layer, source, mask, arr_tiles=None, surrounds=3):
 #----------------------------------------------------------------------
 #
 #----------------------------------------------------------------------
-def python_iso_select_tiles(image, drawable, x, y, tileSize=128):
+def python_iso_select_tiles(image, drawable, x, y, tileSize=64):
     global settings 
     settings = get_settings(tileSize)
     w = settings.width
-    h = w/2
-    #select_tile(image, Tile(BLANK, x, y, True))
-    (dx, dy) = (dx, dy) = (x * w/2, y * h/2)
-    select_diamond_shape(image, w, h, dx, dy)
+    h = settings.width
+    grow = 0
+
+    isox = (x - y) * w  + image.width/2.0 + grow
+    isoy = (x + y) * h / 2 + grow
+    select_diamond_shape(image, w * 2, h, isox, isoy)
+    
 #----------------------------------------------------------------------
 #
 #----------------------------------------------------------------------
-def python_iso_export_transitions(image, output_path, tileSize=128, background=None):
+def python_iso_export_transitions(image, output_path, tileSize=64, background=None):
     global settings 
     settings = get_settings(tileSize)
     def merge_layers(layer1, layer2):
@@ -295,27 +298,29 @@ def python_iso_export_transitions(image, output_path, tileSize=128, background=N
       return None
     layer = get_layer("Check Tiling")
     image.active_layer = layer
+    # exp_list = { 
+    #   "rol1", "ror1", "rot1", "rob1", "rit1", "rib1", 
+    #   "ril1", "rir1", "itl1", "itr1", "ibl1", "ibr1", "full1"
+    # }
     exp_list = { 
-      "rol1", "ror1", "rot1", "rob1", "rit1", "rib1", 
-      "ril1", "rir1", "itl1", "itr1", "ibl1", "ibr1", "full1"
+      "rol1"
     }
     for name in exp_list:
       bk_layer = None
-      select_tile(image, Tile(BLANK, check_tiles[name].x_index, check_tiles[name].y_index, True))
+      python_iso_select_tiles(image, layer, check_tiles[name].x_index, check_tiles[name].y_index, tileSize)
       pdb.gimp_selection_grow(image, 1)
       pdb.gimp_edit_copy(layer)
       fsel = pdb.gimp_edit_paste(layer, False)
-      trns = to_iso_tile(image, fsel)
-      new = pdb.gimp_floating_sel_to_layer(trns)
+      new = pdb.gimp_floating_sel_to_layer(fsel)
       theNewLayer = image.active_layer
 
-      # if background is not None:
-      #   select_tile(image, Tile(BLANK, check_tiles[name].x_index, check_tiles[name].y_index, True))
-      #   pdb.gimp_selection_layer_alpha(background)
-      #   pdb.gimp_edit_copy(background)
-      #   fsel = pdb.gimp_edit_paste(layer, True)
-      #   pdb.gimp_floating_sel_to_layer(fsel)
-      #   bk_layer = image.active_layer
+      if background is not None:
+        #select_tile(image, Tile(BLANK, check_tiles[name].x_index, check_tiles[name].y_index, True))
+        pdb.gimp_selection_layer_alpha(background)
+        pdb.gimp_edit_copy(background)
+        fsel = pdb.gimp_edit_paste(layer, True)
+        pdb.gimp_floating_sel_to_layer(fsel)
+        bk_layer = image.active_layer
         
       if bk_layer is not None:
         theNewLayer = merge_layers(bk_layer, theNewLayer)
@@ -349,7 +354,7 @@ def prepare_sources(image, drawable, source_layer):
 #----------------------------------------------------------------------
 #
 #----------------------------------------------------------------------
-def iso_tiles(image, drawable, source_layer, tileSize=128):
+def iso_tiles(image, drawable, source_layer, tileSize=64):
     global settings
     settings = get_settings(tileSize)
     
@@ -417,7 +422,7 @@ register(
     (PF_IMAGE, "image",       "Input image", None),
     (PF_DRAWABLE, "drawable", "Input drawable", None),
     (PF_DRAWABLE, "source_layer", "Source image", None),
-    (PF_INT, "tileSize", _("Tile width (pixels):"), 128),
+    (PF_INT, "tileSize", _("Tile width (pixels):"), 64),
   ],
   [],
   iso_tiles,
@@ -439,7 +444,7 @@ register(
     (PF_DRAWABLE, "drawable", "Input drawable", None),
     (PF_INT, "x", "X Index", 0),
     (PF_INT, "y", "Y Index", 0),
-    (PF_INT, "tileSize", _("Tile width (pixels):"), 128),
+    (PF_INT, "tileSize", _("Tile width (pixels):"), 64),
   ],
   [],
   python_iso_select_tiles,
@@ -459,7 +464,7 @@ register(
   [
     (PF_IMAGE, "image", "Input image", None),
     (PF_DIRNAME, "output_path", _("Output Path"), os.getcwd()),
-    (PF_INT, "tileSize", _("Tile width (pixels):"), 128),
+    (PF_INT, "tileSize", _("Tile width (pixels):"), 64),
     (PF_DRAWABLE, "background", _("Tile background"), None),
   ],
   [],
