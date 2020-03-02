@@ -276,7 +276,7 @@ def python_iso_select_tiles(image, drawable, x, y, tileSize=64):
 
     isox = (x - y) * w  + image.width/2.0 + grow
     isoy = (x + y) * h / 2 + grow
-    select_diamond_shape(image, w * 2, h, isox, isoy)
+    return select_diamond_shape(image, w * 2, h, isox, isoy)
     
 #----------------------------------------------------------------------
 #
@@ -298,24 +298,21 @@ def python_iso_export_transitions(image, output_path, tileSize=64, background=No
       return None
     layer = get_layer("Check Tiling")
     image.active_layer = layer
-    # exp_list = { 
-    #   "rol1", "ror1", "rot1", "rob1", "rit1", "rib1", 
-    #   "ril1", "rir1", "itl1", "itr1", "ibl1", "ibr1", "full1"
-    # }
     exp_list = { 
-      "rol1"
+      "rol1", "ror1", "rot1", "rob1", "rit1", "rib1", 
+      "ril1", "rir1", "itl1", "itr1", "ibl1", "ibr1", "full1"
     }
+    
     for name in exp_list:
       bk_layer = None
-      python_iso_select_tiles(image, layer, check_tiles[name].x_index, check_tiles[name].y_index, tileSize)
-      pdb.gimp_selection_grow(image, 1)
+      s = python_iso_select_tiles(image, layer, check_tiles[name].x_index, check_tiles[name].y_index, tileSize)
+      #pdb.gimp_selection_grow(image, 1)
       pdb.gimp_edit_copy(layer)
       fsel = pdb.gimp_edit_paste(layer, False)
       new = pdb.gimp_floating_sel_to_layer(fsel)
       theNewLayer = image.active_layer
 
       if background is not None:
-        #select_tile(image, Tile(BLANK, check_tiles[name].x_index, check_tiles[name].y_index, True))
         pdb.gimp_selection_layer_alpha(background)
         pdb.gimp_edit_copy(background)
         fsel = pdb.gimp_edit_paste(layer, True)
@@ -323,6 +320,8 @@ def python_iso_export_transitions(image, output_path, tileSize=64, background=No
         bk_layer = image.active_layer
         
       if bk_layer is not None:
+        offs = pdb.gimp_drawable_offsets(theNewLayer)
+        pdb.gimp_layer_set_offsets(bk_layer, offs[0], offs[1])
         theNewLayer = merge_layers(bk_layer, theNewLayer)
       
       fullpath = os.path.join(output_path, name) + ".png"
