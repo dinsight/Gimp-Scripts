@@ -145,12 +145,12 @@ settings = None
 #----------------------------------------------------------------------
 # Utils
 #----------------------------------------------------------------------
-def get_settings(tileSize):
+def get_settings(tileSize, neighbourhood, map_weight):
     w = tileSize
-    settings = Settings(w, 41.0, 0.5, 0.12, 30, 200)
+    settings = Settings(w, 41.0, map_weight, 0.12, neighbourhood, 200)
     return settings
 def to_iso_tile(img, layer, grow=0):
-  pdb.gimp_context_set_interpolation(gimpenums.INTERPOLATION_NONE)
+  #pdb.gimp_context_set_interpolation(gimpenums.INTERPOLATION_NONE)
   item = pdb.gimp_item_transform_rotate(layer, math.pi/4, True, 0, 0)
   dw = settings.width * 2
   dh = settings.width
@@ -167,7 +167,7 @@ def select_diamond_shape(img, w, h, dx, dy):
     return selection
 def select_tile(img, tile, select_full=False):
     h = w = settings.width
-    inset_size = settings.inset  
+    inset_size = settings.inset
     (dx, dy) = (tile.x_index * w, tile.y_index * h)
     def select_circle(cx,cy,cr, op=gimpenums.CHANNEL_OP_REPLACE):
       (x,y) = (cx-cr, cy-cr)
@@ -188,57 +188,54 @@ def select_tile(img, tile, select_full=False):
       if tile.inset_type & INSET_BOTTOM_RIGHT>0:    pdb.gimp_image_select_rectangle(img, gimpenums.CHANNEL_OP_SUBTRACT, dx+inset_size, dy, w-inset_size, h )
       if tile.inset_type & INSET_BOTTOM_LEFT>0:     pdb.gimp_image_select_rectangle(img, gimpenums.CHANNEL_OP_SUBTRACT, dx, dy+inset_size, w, h-inset_size )
         
-def copy_tile(img, srcLayer, src_tile, destLayer, dest_tile, grow=0):
+
+def copy_tile(img, srcLayer, src_tile, destLayer, dest_tile, to_iso=False):
   antialias = pdb.gimp_context_get_antialias()
   pdb.gimp_context_set_antialias(False)
   
-  python_iso_select_tiles(img, srcLayer, src_tile.x_index, src_tile.y_index)
-  if grow > 0 : pdb.gimp_selection_grow(img, grow)
-  pdb.gimp_edit_copy(srcLayer)
-  python_iso_select_tiles(img, destLayer, dest_tile.x_index, dest_tile.y_index)
-  if grow > 0 : pdb.gimp_selection_grow(img, grow)
-  fsel = pdb.gimp_edit_paste(destLayer, False)
-  pdb.gimp_floating_sel_anchor(fsel)
-
+  if to_iso:
+    w = h = settings.width
+    (dx, dy) = (dest_tile.x_index , dest_tile.y_index )
+    select_tile(img, src_tile, True)
+    grow = 0
+    pdb.gimp_selection_grow(img, grow)
+    pdb.gimp_edit_copy(srcLayer)
+    select_tile(img, dest_tile, True)
+    pdb.gimp_selection_grow(img, grow)
+    fsel = pdb.gimp_edit_paste(destLayer, False)
+    fsel = to_iso_tile(img, fsel, grow)
+    isox = (dx - dy) *w  + img.width/2.0 + grow
+    isoy = (dx + dy) *h / 2 + grow
+    #pdb.gimp_message('dx={}, dy={}, isox={}, isoy={}'.format(dx, dy, isox, -isoy))
+    pdb.gimp_layer_translate(fsel, isox, isoy)
+    pdb.gimp_floating_sel_anchor(fsel)
+  else:
+    select_tile(img, src_tile)
+    pdb.gimp_edit_copy(srcLayer)
+    select_tile(img, dest_tile)
+    fsel = pdb.gimp_edit_paste(destLayer, False)
+    pdb.gimp_floating_sel_anchor(fsel)
+  
   pdb.gimp_context_set_antialias(antialias)
 
-def copy_tiles_with_prefix(img, srcLayer, src_tile, destLayer, dest_tile, prefixes=[], grow=0):
+def copy_tiles_with_prefix(img, srcLayer, src_tile, destLayer, dest_tile, prefixes=[], to_iso=False):
   def remove_digits(name): 
     pattern = '[0-9]'
     return re.sub(pattern, '', name)
   for dest_key in dest_tile.keys():
     key = remove_digits(dest_key)
     if key in src_tile and key in prefixes:
-      copy_tile(img, srcLayer, src_tile[key], destLayer, dest_tile[dest_key], grow)
+      copy_tile(img, srcLayer, src_tile[key], destLayer, dest_tile[dest_key], to_iso)
 
 def place_tiles(img, ts, layer, showall=False, grow=0):
   antialias = pdb.gimp_context_get_antialias()
   pdb.gimp_context_set_antialias(False)
   for tile in ts.values():
     if tile.show == True or showall==True:
-      w = settings.width
-      (dx, dy) = (tile.x_index , tile.y_index )
       select_tile(img, tile)
-      pdb.gimp_selection_sharpen(img)
       if grow > 0 : pdb.gimp_selection_grow(img, grow)
-
-      tmp_layer = gimp.Layer(img, "tmp", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
-      img.add_layer(tmp_layer)
-      pdb.gimp_edit_fill(tmp_layer, gimpenums.FOREGROUND_FILL)
-      select_tile(img, tile, True)
-      pdb.gimp_selection_sharpen(img)
-        
-      pdb.gimp_edit_copy(tmp_layer)
-      fsel = pdb.gimp_edit_paste(layer, False)
-      fsel = to_iso_tile(img, fsel, grow)
-      isox = (dx - dy) *w + img.width/2 + grow
-      isoy = (dx + dy) *w/2 + grow
-      pdb.gimp_layer_translate(fsel, isox, isoy)
-      pdb.gimp_floating_sel_anchor(fsel)
-      img.remove_layer(tmp_layer)
-      
+      pdb.gimp_edit_fill(layer, gimpenums.FOREGROUND_FILL)
   pdb.gimp_context_set_antialias(antialias)
-  pdb.gimp_selection_clear(img)
 
 def synth_tileset(img, layer, source, mask, arr_tiles=None, surrounds=3):
   if arr_tiles is None:
@@ -247,7 +244,7 @@ def synth_tileset(img, layer, source, mask, arr_tiles=None, surrounds=3):
   else:
     sel_channels = []
     for item in arr_tiles:
-      python_iso_select_tiles(img, layer, item.x_index, item.y_index)
+      select_tile(img, item, True)
       sel_channels.append(pdb.gimp_selection_save(img))
     pdb.gimp_selection_clear(img)
     for s in sel_channels:
@@ -271,19 +268,21 @@ def synth_tileset(img, layer, source, mask, arr_tiles=None, surrounds=3):
 #----------------------------------------------------------------------
 #
 #----------------------------------------------------------------------
-def python_iso_select_tiles(image, drawable, x, y, tileSize=128):
+def python_iso_select_tiles(image, drawable, x, y, tileSize=64):
     global settings 
-    grow = 0
     settings = get_settings(tileSize)
     w = settings.width
-    (dx, dy) = (x , y)
-    isox = (dx - dy) *w + image.width/2 + grow
-    isoy = (dx + dy) *w/2 + grow
-    select_diamond_shape(image, 2*w, w, dx + isox, dy + isoy)
+    h = settings.width
+    grow = 0
+
+    isox = (x - y) * w  + image.width/2.0 + grow
+    isoy = (x + y) * h / 2 + grow
+    return select_diamond_shape(image, w * 2, h, isox, isoy)
+    
 #----------------------------------------------------------------------
 #
 #----------------------------------------------------------------------
-def python_iso_export_transitions(image, output_path, tileSize=128, background=None):
+def python_iso_export_transitions(image, output_path, tileSize=64, background=None):
     global settings 
     settings = get_settings(tileSize)
     def merge_layers(layer1, layer2):
@@ -304,25 +303,26 @@ def python_iso_export_transitions(image, output_path, tileSize=128, background=N
       "rol1", "ror1", "rot1", "rob1", "rit1", "rib1", 
       "ril1", "rir1", "itl1", "itr1", "ibl1", "ibr1", "full1"
     }
+    
     for name in exp_list:
       bk_layer = None
-      select_tile(image, Tile(BLANK, check_tiles[name].x_index, check_tiles[name].y_index, True))
-      pdb.gimp_selection_grow(image, 1)
+      s = python_iso_select_tiles(image, layer, check_tiles[name].x_index, check_tiles[name].y_index, tileSize)
+      #pdb.gimp_selection_grow(image, 1)
       pdb.gimp_edit_copy(layer)
       fsel = pdb.gimp_edit_paste(layer, False)
-      trns = to_iso_tile(image, fsel)
-      new = pdb.gimp_floating_sel_to_layer(trns)
+      new = pdb.gimp_floating_sel_to_layer(fsel)
       theNewLayer = image.active_layer
 
-      # if background is not None:
-      #   select_tile(image, Tile(BLANK, check_tiles[name].x_index, check_tiles[name].y_index, True))
-      #   pdb.gimp_selection_layer_alpha(background)
-      #   pdb.gimp_edit_copy(background)
-      #   fsel = pdb.gimp_edit_paste(layer, True)
-      #   pdb.gimp_floating_sel_to_layer(fsel)
-      #   bk_layer = image.active_layer
+      if background is not None:
+        pdb.gimp_selection_layer_alpha(background)
+        pdb.gimp_edit_copy(background)
+        fsel = pdb.gimp_edit_paste(layer, True)
+        pdb.gimp_floating_sel_to_layer(fsel)
+        bk_layer = image.active_layer
         
       if bk_layer is not None:
+        offs = pdb.gimp_drawable_offsets(theNewLayer)
+        pdb.gimp_layer_set_offsets(bk_layer, offs[0], offs[1])
         theNewLayer = merge_layers(bk_layer, theNewLayer)
       
       fullpath = os.path.join(output_path, name) + ".png"
@@ -330,59 +330,85 @@ def python_iso_export_transitions(image, output_path, tileSize=128, background=N
       image.remove_layer(theNewLayer)
       image.active_layer = layer
 
+def prepare_sources(image, drawable, source_layer):
+  img = gimp.Image(settings.width,settings.width,gimpenums.RGB)
+  source = pdb.gimp_layer_new_from_drawable(source_layer, img)
+  img.add_layer(source)
+
+  source = pdb.gimp_item_transform_rotate(source, -math.pi/4, True, 0, 0)
+  source.name = "Source-tmp"
+  pdb.gimp_layer_set_offsets(source, 0, 0)
+
+  pdb.gimp_image_resize_to_layers(img)
+  pdb.gimp_selection_layer_alpha(source)
+  mask = gimp.Layer(img, "Mask-tmp", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+  img.add_layer(mask)
+  
+  pdb.gimp_layer_resize_to_image_size(mask)
+  pdb.gimp_edit_fill(mask, gimpenums.FOREGROUND_FILL)
+  pdb.gimp_selection_invert(img)
+  pdb.gimp_edit_fill(mask, gimpenums.BACKGROUND_FILL)
+  pdb.gimp_selection_clear(img)
+  return (source, mask, img)
+
 #----------------------------------------------------------------------
 #
 #----------------------------------------------------------------------
-def iso_tiles(image, drawable, source, mask, tileSize=128):
+def iso_tiles(image, drawable, source_layer, tileSize=64, neighbourhood=50, map_weight=0.5):
     global settings
-    settings = get_settings(tileSize)
+    settings = get_settings(tileSize, neighbourhood, map_weight)
     
     img = gimp.Image(8*settings.width*2,9*settings.width,gimpenums.RGB)
+    prep = prepare_sources(image, drawable, source_layer)
+    source = prep[0]
+    mask = prep[1]
+    tmpImg = prep[2]
+    
     #----------------------------------------Outside Corners----------------------------------------
     oc_layer = gimp.Layer(img, "OutsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(oc_layer)
-    place_tiles(img, ts_oc, oc_layer, grow=0)
-    synth_tileset(img, oc_layer, source, mask, surrounds=3)
+    place_tiles(img, ts_oc, oc_layer)
+    synth_tileset(img, oc_layer, source, mask, surrounds=4)
     #----------------------------------------Side1----------------------------------------
     sides1_layer = gimp.Layer(img, "Sides1", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(sides1_layer)
-    copy_tiles_with_prefix(img, oc_layer, ts_oc, sides1_layer, ts_side1, ["rol", "rot", "rob", "ror"], grow=0)
-    place_tiles(img, ts_side1, sides1_layer, grow=0)
-    synth_tileset(img, sides1_layer, source, mask, filter_tileset(ts_side1, ["itl", "ibr"]), surrounds=0)
-    # #----------------------------------------Side2----------------------------------------
+    copy_tiles_with_prefix(img, oc_layer, ts_oc, sides1_layer, ts_side1, ["rol", "rot", "rob", "ror"])
+    place_tiles(img, ts_side1, sides1_layer)
+    synth_tileset(img, sides1_layer, source, mask, filter_tileset(ts_side1, ["itl", "ibr"]), surrounds=1)
+    #----------------------------------------Side2----------------------------------------
     sides2_layer = gimp.Layer(img, "Sides2", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(sides2_layer)
     copy_tiles_with_prefix(img, oc_layer, ts_oc, sides2_layer, ts_side2, ["rol", "rot", "rob", "ror"])
-    place_tiles(img, ts_side2, sides2_layer, grow=1)
-    synth_tileset(img, sides2_layer, source, mask, filter_tileset(ts_side2, ["itr", "ibl"]), surrounds=0)
+    place_tiles(img, ts_side2, sides2_layer)
+    synth_tileset(img, sides2_layer, source, mask, filter_tileset(ts_side2, ["itr", "ibl"]), surrounds=1)
 
-    # #----------------------------------------Full tile----------------------------------------
+    #----------------------------------------Full tile----------------------------------------
     full_tile_layer = gimp.Layer(img, "FullTile", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
     img.add_layer(full_tile_layer)
     copy_tiles_with_prefix(img, oc_layer, ts_oc, full_tile_layer, full_tile, ["rol", "rot", "rob", "ror"])
     copy_tiles_with_prefix(img, sides1_layer, ts_side1, full_tile_layer, full_tile, ["itl", "ibr" ])
     copy_tiles_with_prefix(img, sides2_layer, ts_side2, full_tile_layer, full_tile, ["itr", "ibl" ])
-    place_tiles(img, full_tile, full_tile_layer, grow=1)
+    place_tiles(img, full_tile, full_tile_layer, grow=0)
     synth_tileset(img, full_tile_layer, source, mask, filter_tileset(full_tile, ["full"]), surrounds=0)
     
-    # #----------------------------------------Inside Corners----------------------------------------
-    # ic_layer = gimp.Layer(img, "InsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
-    # img.add_layer(ic_layer)
-    # copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["itl", "ibr"])
-    # copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["itr", "ibl"])
-    # copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["full"])
-    # place_tiles(img, ts_inside, ic_layer, grow=1)
-    # synth_tileset(img, ic_layer, source, mask, filter_tileset(ts_inside, ["ril", "rir", "rit", "rib"]), surrounds=0)
+    #----------------------------------------Inside Corners----------------------------------------
+    ic_layer = gimp.Layer(img, "InsideCorners", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+    img.add_layer(ic_layer)
+    copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["itl", "ibr"])
+    copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["itr", "ibl"])
+    copy_tiles_with_prefix(img, full_tile_layer, full_tile, ic_layer, ts_inside, ["full"])
+    place_tiles(img, ts_inside, ic_layer)
+    synth_tileset(img, ic_layer, source, mask, filter_tileset(ts_inside, ["ril", "rir", "rit", "rib"]), surrounds=1)
 
-    # #---------------------------------------- Check tiling ----------------------------------------
-    # check_layer = gimp.Layer(img, "Check Tiling", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
-    # img.add_layer(check_layer)
-    # copy_tiles_with_prefix(img, full_tile_layer, full_tile, check_layer, check_tiles, ["itl","itr","ibl","ibr","rol","ror","rot","rob","full"])
-    # copy_tiles_with_prefix(img, ic_layer, ts_inside, check_layer, check_tiles, ["ril","rir","rit","rib"])
-    # place_tiles(img, check_tiles, check_layer, True)
+    #---------------------------------------- Check tiling ----------------------------------------
+    check_layer = gimp.Layer(img, "Check Tiling", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+    img.add_layer(check_layer)
+    copy_tiles_with_prefix(img, full_tile_layer, full_tile, check_layer, check_tiles, ["itl","itr","ibl","ibr","rol","ror","rot","rob","full"], True)
+    copy_tiles_with_prefix(img, ic_layer, ts_inside, check_layer, check_tiles, ["ril","rir","rit","rib"], True)
     
     d = gimp.Display(img)
-
+    pdb.gimp_image_delete(tmpImg)
+    
 register(
   "python_iso_tiles",
   N_("Create Iso Tiles from pattern"),
@@ -395,9 +421,11 @@ register(
   [
     (PF_IMAGE, "image",       "Input image", None),
     (PF_DRAWABLE, "drawable", "Input drawable", None),
-    (PF_DRAWABLE, "source", "Source image", None),
-    (PF_DRAWABLE, "mask", "Source mask", None),
-    (PF_INT, "tileSize", _("Tile width (pixels):"), 128),
+    (PF_DRAWABLE, "source_layer", "Source image", None),
+    (PF_INT, "tileSize", _("Tile width (pixels):"), 64),
+    (PF_INT, "neighbourhood", _("Neighbourhood(pixels):"), 50),
+    (PF_VALUE, "map_weight", _("Map weight:"), 0.5),
+    
   ],
   [],
   iso_tiles,
@@ -419,7 +447,7 @@ register(
     (PF_DRAWABLE, "drawable", "Input drawable", None),
     (PF_INT, "x", "X Index", 0),
     (PF_INT, "y", "Y Index", 0),
-    (PF_INT, "tileSize", _("Tile width (pixels):"), 128),
+    (PF_INT, "tileSize", _("Tile width (pixels):"), 64),
   ],
   [],
   python_iso_select_tiles,
@@ -439,7 +467,7 @@ register(
   [
     (PF_IMAGE, "image", "Input image", None),
     (PF_DIRNAME, "output_path", _("Output Path"), os.getcwd()),
-    (PF_INT, "tileSize", _("Tile width (pixels):"), 128),
+    (PF_INT, "tileSize", _("Tile width (pixels):"), 64),
     (PF_DRAWABLE, "background", _("Tile background"), None),
   ],
   [],
