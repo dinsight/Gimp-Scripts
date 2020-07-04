@@ -117,6 +117,30 @@ def copy_tile(img, source_tile, dest_tile, source_layer, dest_layer, select_full
   pdb.gimp_floating_sel_anchor(fsel)
   pdb.gimp_context_set_antialias(False)
   pdb.gimp_context_set_antialias(antialias)
+
+#----------------------------------------------------------------------
+#
+#----------------------------------------------------------------------
+def make_transition_layer(image, tile, mask, background, tileSize, mask_pos_x, mask_pos_y, name, pad=1):
+  bk = pdb.gimp_layer_new_from_drawable(background, image)
+  transition = pdb.gimp_layer_new_from_drawable(tile, image)
+  transition.name = name
+  image.add_layer(bk)
+  image.add_layer(transition)
+      
+  do_select_tile(mask.image, mask, mask_pos_x, mask_pos_y, tileSize)
+  pdb.gimp_edit_copy(mask)
+  theMask = pdb.gimp_layer_create_mask(transition, gimpenums.ADD_BLACK_MASK)
+  pdb.gimp_layer_add_mask(transition, theMask)
+  fsel = pdb.gimp_edit_paste(theMask, False)
+
+  s = select_diamond_shape(image, tileSize * 2, tileSize, 0, 0)
+  fsel = pdb.gimp_item_transform_scale(fsel, s[0]-pad, s[3]-pad, s[4]+pad, s[7]+pad)
+
+  pdb.gimp_floating_sel_anchor(fsel)
+  merged_layer = merge_layers(image, transition, bk)
+  merged_layer.name = name
+  return merged_layer
 #----------------------------------------------------------------------
 #
 #----------------------------------------------------------------------
@@ -161,7 +185,7 @@ def do_iso_tiles(image, drawable, source_layer, tileSize=64):
     tile_layer.name = "tile"
     img.lower_layer(tile_layer)
 
-    select_diamond_shape(image, tileSize * 2, tileSize, 0, 0)
+    select_diamond_shape(img, tileSize * 2, tileSize, 0, 0)
     pdb.gimp_selection_invert(img)
     img.active_layer = orig
     pdb.gimp_edit_clear(orig)
@@ -300,55 +324,93 @@ def do_transitions_to_iso(img, drawable, tileSize=64):
 #----------------------------------------------------------------------
 def do_export_transitions(image, output_path, tile, mask=None, background=None, tileSize=64):
     pad = 1
-    def save_file(name, layer):
+    def save_transition(mask_pos_x, mask_pos_y, name):
+      layer = make_transition_layer(image, tile, mask, background, tileSize, mask_pos_x, mask_pos_y, name)
       fullpath = os.path.join(output_path, name) + ".png"
       layer = pdb.gimp_item_transform_scale(layer, -pad, -pad, 2 * tileSize + pad, tileSize+pad)
       pdb.gimp_file_save(image, layer, fullpath, name)
       layer = pdb.gimp_item_transform_scale(layer, 0, 0, 2 * tileSize, tileSize)
+      image.remove_layer(layer)
+    def save_layer(layer):
+      fullpath = os.path.join(output_path, layer.name) + ".png"
+      layer = pdb.gimp_item_transform_scale(layer, -pad, -pad, 2 * tileSize + pad, tileSize+pad)
+      pdb.gimp_file_save(image, layer, fullpath, layer.name)
+      layer = pdb.gimp_item_transform_scale(layer, 0, 0, 2 * tileSize, tileSize)
 
-    def make_transition_layer(x, y, name):
-      bk = pdb.gimp_layer_new_from_drawable(background, image)
-      transition = pdb.gimp_layer_new_from_drawable(tile, image)
-      transition.name = name
-      image.add_layer(bk)
-      image.add_layer(transition)
-      
-      do_select_tile(mask.image, mask, x, y, tileSize)
-      pdb.gimp_edit_copy(mask)
-      theMask = pdb.gimp_layer_create_mask(transition, gimpenums.ADD_BLACK_MASK)
-      pdb.gimp_layer_add_mask(transition, theMask)
-      fsel = pdb.gimp_edit_paste(theMask, False)
+    save_transition(0,0, "OutsideTop")
+    save_transition(0,1, "OutsideLeft")
+    save_transition(0,2, "OutsideRight")
+    save_transition(1,1, "OutsideBottom")
+    save_transition(1,2, "InsetTopLeft")
+    save_transition(1,3, "InsetBottomLeft")
+    save_transition(2,2, "InsetTopRight")
+    save_transition(2,3, "InsetBottomRight")
 
-      s = select_diamond_shape(image, tileSize * 2, tileSize, 0, 0)
-      fsel = pdb.gimp_item_transform_scale(fsel, s[0]-pad, s[3]-pad, s[4]+pad, s[7]+pad)
-
-      pdb.gimp_floating_sel_anchor(fsel)
-      merged_layer = merge_layers(image, transition, bk)
-      merged_layer.name = name
-      save_file(name, merged_layer)
-      image.remove_layer(merged_layer)
-
-    make_transition_layer(0,0, "OutsideTop")
-    make_transition_layer(0,1, "OutsideLeft")
-    make_transition_layer(0,2, "OutsideRight")
-    make_transition_layer(1,1, "OutsideBottom")
-    make_transition_layer(1,2, "InsetTopLeft")
-    make_transition_layer(1,3, "InsetBottomLeft")
-    make_transition_layer(2,2, "InsetTopRight")
-    make_transition_layer(2,3, "InsetBottomRight")
-
-    make_transition_layer(2,4, "InsideTop")
-    make_transition_layer(3,3, "InsideBottom")
-    make_transition_layer(3,4, "InsideLeft")
-    make_transition_layer(4,4, "InsideRight")
-    save_file(tile.name, tile)
+    save_transition(2,4, "InsideTop")
+    save_transition(3,3, "InsideBottom")
+    save_transition(3,4, "InsideLeft")
+    save_transition(4,4, "InsideRight")
+    save_layer(tile)
 
 #----------------------------------------------------------------------
 # 
 #----------------------------------------------------------------------
-def do_demo_tiles(image, tile, mask, background=None, tileSize=64):
-  iso = gimp.Layer(image, "Demo", image.width,image.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
-  image.add_layer(iso)
+def do_demo_tiles(image, tile, mask, background, tileSize=64):
+  pad = 1
+  w = h = tileSize
+  global settings
+  settings =  Settings(tileSize, 41.0)
+  img = gimp.Image(settings.width*20,settings.width*10,gimpenums.RGB)
+  demo = gimp.Layer(img, "Demo", image.width,image.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
+  img.add_layer(demo)
+
+  def move(img, layer, dest):
+    (dx, dy) = (dest[1] , dest[0] )      
+    isox = (dx - dy) *w  + img.width/2.0
+    isoy = (dx + dy) *h / 2
+    pdb.gimp_layer_translate(layer, isox, isoy)
+    return layer
+
+  def place_tile(img, layer, destinations):
+    for dest in destinations:
+      copy = pdb.gimp_layer_new_from_drawable(layer, img)
+      img.add_layer(copy)
+      copy = pdb.gimp_item_transform_scale(copy, -pad, -pad, 2 * tileSize + pad, tileSize+pad)
+      move(img, copy, dest)
+
+  def place_transition(img, mask_pos_x, mask_pos_y, name, destinations):
+    layer = make_transition_layer(img, tile, mask, background, tileSize, mask_pos_x, mask_pos_y, name)
+    layer = pdb.gimp_item_transform_scale(layer, -pad, -pad, 2 * tileSize + pad, tileSize+pad)
+    for dest in destinations:
+      copy = pdb.gimp_layer_new_from_drawable(layer, img)
+      img.add_layer(copy)
+      move(img, copy, dest)
+    img.remove_layer(layer)
+
+  #place_transition( 0,0, "OutsideTop", [[0,0], [0,1], [0,2]])
+  place_transition(img, 0, 0, "OutsideTop", [[0,0], [-2,3]])
+  place_transition(img, 0, 2, "OutsideRight", [[-2,4], [0,5]])
+  place_transition(img, 2, 2, "InsetTopRight", [[0,1], [0,2]])
+  place_transition(img, 1, 2, "InsetTopLeft", [[-1,3], [1,0], [2,0], [3,0], [5, 3]])
+  place_transition(img, 2, 4, "InsideTop", [[0, 3]])
+  place_transition(img, 1, 3, "InsetBottomLeft", [[4, 1], [4,2]]) 
+  place_transition(img, 2, 3, "InsetBottomRight", [[5,4], [4,4], [-1,4], [1,5],[2,5]])
+  place_transition(img, 3, 4, "InsideLeft", [[4,3]])
+  place_transition(img, 0, 1, "OutsideLeft", [[4,0],[6, 3]])
+  place_transition(img, 1, 1, "OutsideBottom", [[6,4],[3,5]])
+  place_transition(img, 3, 3, "InsideBottom", [[3,4]])
+  place_transition(img, 4, 4, "InsideRight", [[0,4]])
+  #place_transition(img, 4, 4, "InsideRight", [[]])
+  place_tile(img, tile, [[1,1],[2,1], [3,1],
+    [1,2],[2,2], [3,2],
+    [1,3],[2,3], [3,3],
+    [1,4],[2,4]
+  ])
+
+  for l in img.layers:
+    pdb.gimp_drawable_set_visible(l, True) 
+  pdb.gimp_image_flatten(img)
+  gimp.Display(img)
 
 #----------------------------------------------------------------------
 # Registration
@@ -382,7 +444,7 @@ register(
   "Alex Cotoman",
   "2020 Alex Cotoman",  # Copyright 
   "2020",
-  N_("_Create Isometric tiles..."),
+  N_("_Create ISO tiles from selection..."),
   "RGB*, GRAY*",
   [
     (PF_IMAGE, "image",       "Input image", None),
@@ -501,17 +563,17 @@ register(
 
 register(
   "do_demo_tiles",
-  N_("Demo Tiles"),
+  N_("Test Tile Layout"),
   "",
   "Alex Cotoman",
   "2020 Alex Cotoman",  # Copyright 
   "2020",
-  N_("_Demo tiles..."),
+  N_("_Test tile layout..."),
   "RGB*, GRAY*",
   [
     (PF_IMAGE, "image", "Input image", None),
     (PF_DRAWABLE, "tile", _("Tile"), None),
-    (PF_DRAWABLE, "mask", _("Tile masks"), None),
+    (PF_DRAWABLE, "mask", _("Masks"), None),
     (PF_DRAWABLE, "background", _("Tile background"), None),
     (PF_INT, "tileSize", _("Tile width (pixels):"), 64)
   ],
