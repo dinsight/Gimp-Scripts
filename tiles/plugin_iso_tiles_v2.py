@@ -446,7 +446,7 @@ register(
   ],
   [],
   do_select_tile,
-  menu="<Image>/Filters/TilesV2"
+  menu="<Image>/Filters/Tiles"
 )
 
 register(
@@ -466,7 +466,7 @@ register(
   ],
   [],
   do_iso_tiles,
-  menu="<Image>/Filters/TilesV2",
+  menu="<Image>/Filters/Tiles",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -486,7 +486,7 @@ register(
   ],
   [],
   do_create_corners,
-  menu="<Image>/Filters/TilesV2/Transitions",
+  menu="<Image>/Filters/Tiles/Transitions",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -506,7 +506,7 @@ register(
   ],
   [],
   do_create_sides,
-  menu="<Image>/Filters/TilesV2/Transitions",
+  menu="<Image>/Filters/Tiles/Transitions",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -526,7 +526,7 @@ register(
   ],
   [],
   do_create_inside_corners,
-  menu="<Image>/Filters/TilesV2/Transitions",
+  menu="<Image>/Filters/Tiles/Transitions",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -546,7 +546,7 @@ register(
   ],
   [],
   do_transitions_to_iso,
-  menu="<Image>/Filters/TilesV2/Transitions",
+  menu="<Image>/Filters/Tiles/Transitions",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -569,7 +569,7 @@ register(
   ],
   [],
   do_export_transitions,
-  menu="<Image>/Filters/TilesV2/Export",
+  menu="<Image>/Filters/Tiles/Export",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -590,7 +590,7 @@ register(
   ],
   [],
   do_export_tile,
-  menu="<Image>/Filters/TilesV2/Export",
+  menu="<Image>/Filters/Tiles/Export",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -612,7 +612,7 @@ register(
   ],
   [],
   do_demo_tiles,
-  menu="<Image>/Filters/TilesV2",
+  menu="<Image>/Filters/Tiles",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
