@@ -355,6 +355,18 @@ def do_export_transitions(image, output_path, tile, mask=None, background=None, 
 #----------------------------------------------------------------------
 # 
 #----------------------------------------------------------------------
+def do_export_tile(image, drawable, output_path, tileSize=64):
+  pad = 1
+  def save_layer(layer):
+      fullpath = os.path.join(output_path, layer.name) + ".png"
+      layer = pdb.gimp_item_transform_scale(layer, -pad, -pad, 2 * tileSize + pad, tileSize+pad)
+      pdb.gimp_file_save(image, layer, fullpath, layer.name)
+      layer = pdb.gimp_item_transform_scale(layer, 0, 0, 2 * tileSize, tileSize)
+  save_layer(drawable)
+
+#----------------------------------------------------------------------
+# 
+#----------------------------------------------------------------------
 def do_demo_tiles(image, tile, mask, background, tileSize=64):
   pad = 1
   w = h = tileSize
@@ -422,7 +434,7 @@ register(
   "Alex Cotoman",
   "2020 Alex Cotoman",  # Copyright 
   "2020",
-  N_("_Select tiles..."),
+  N_("_Select Tile..."),
   "RGB*, GRAY*",
   [
     (PF_IMAGE, "image",       "Input image", None),
@@ -444,7 +456,7 @@ register(
   "Alex Cotoman",
   "2020 Alex Cotoman",  # Copyright 
   "2020",
-  N_("_Create ISO tiles from selection..."),
+  N_("_To ISO Tile Pattern..."),
   "RGB*, GRAY*",
   [
     (PF_IMAGE, "image",       "Input image", None),
@@ -540,12 +552,12 @@ register(
 
 register(
   "do_export_transitions",
-  N_("Export Tiles"),
+  N_("Export All Tiles"),
   "",
   "Alex Cotoman",
   "2020 Alex Cotoman",  # Copyright 
   "2020",
-  N_("_Export tiles..."),
+  N_("_Export All Tiles..."),
   "RGB*, GRAY*",
   [
     (PF_IMAGE, "image", "Input image", None),
@@ -557,7 +569,28 @@ register(
   ],
   [],
   do_export_transitions,
-  menu="<Image>/Filters/TilesV2",
+  menu="<Image>/Filters/TilesV2/Export",
+  domain=("resynthesizer", gimp.locale_directory)
+  )
+
+register(
+  "do_export_tile",
+  N_("Export Single Tile"),
+  "",
+  "Alex Cotoman",
+  "2020 Alex Cotoman",  # Copyright 
+  "2020",
+  N_("_Export Single Tile..."),
+  "RGB*, GRAY*",
+  [
+    (PF_IMAGE, "image", "Input image", None),
+    (PF_DRAWABLE, "drawable", "Input drawable", None),
+    (PF_DIRNAME, "output_path", _("Output Path"), os.getcwd()),
+    (PF_INT, "tileSize", _("Tile width (pixels):"), 64)
+  ],
+  [],
+  do_export_tile,
+  menu="<Image>/Filters/TilesV2/Export",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -568,7 +601,7 @@ register(
   "Alex Cotoman",
   "2020 Alex Cotoman",  # Copyright 
   "2020",
-  N_("_Test tile layout..."),
+  N_("_Test Layout..."),
   "RGB*, GRAY*",
   [
     (PF_IMAGE, "image", "Input image", None),
