@@ -446,7 +446,7 @@ register(
   ],
   [],
   do_select_tile,
-  menu="<Image>/Filters/Tiles"
+  menu="<Image>/Filters/Tiles/Tools"
 )
 
 register(
@@ -456,7 +456,7 @@ register(
   "Alex Cotoman",
   "2020 Alex Cotoman",  # Copyright 
   "2020",
-  N_("_To ISO Tile Pattern..."),
+  N_("_Create ISO Tile From Pattern..."),
   "RGB*, GRAY*",
   [
     (PF_IMAGE, "image",       "Input image", None),
@@ -466,7 +466,7 @@ register(
   ],
   [],
   do_iso_tiles,
-  menu="<Image>/Filters/Tiles",
+  menu="<Image>/Filters/Tiles/Tools",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -486,7 +486,7 @@ register(
   ],
   [],
   do_create_corners,
-  menu="<Image>/Filters/Tiles/Transitions",
+  menu="<Image>/Filters/Tiles/Tools/Transitions",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -506,7 +506,7 @@ register(
   ],
   [],
   do_create_sides,
-  menu="<Image>/Filters/Tiles/Transitions",
+  menu="<Image>/Filters/Tiles/Tools/Transitions",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -526,7 +526,7 @@ register(
   ],
   [],
   do_create_inside_corners,
-  menu="<Image>/Filters/Tiles/Transitions",
+  menu="<Image>/Filters/Tiles/Tools/Transitions",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -546,7 +546,7 @@ register(
   ],
   [],
   do_transitions_to_iso,
-  menu="<Image>/Filters/Tiles/Transitions",
+  menu="<Image>/Filters/Tiles/Tools/Transitions",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -569,7 +569,7 @@ register(
   ],
   [],
   do_export_transitions,
-  menu="<Image>/Filters/Tiles/Export",
+  menu="<Image>/Filters/Tiles/Tools/Export",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -590,7 +590,7 @@ register(
   ],
   [],
   do_export_tile,
-  menu="<Image>/Filters/Tiles/Export",
+  menu="<Image>/Filters/Tiles/Tools/Export",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
@@ -612,7 +612,7 @@ register(
   ],
   [],
   do_demo_tiles,
-  menu="<Image>/Filters/Tiles",
+  menu="<Image>/Filters/Tiles/Tools",
   domain=("resynthesizer", gimp.locale_directory)
   )
 
