@@ -132,6 +132,16 @@ def prapare_mask(layer, index, tileSize):
 #----------------------------------------------------------------------
 # 
 #----------------------------------------------------------------------
+def select_tile(img, layer, index, tileSize=64):
+    image_index = number.index(index)
+    row = image_index / layout_size
+    col = image_index - (row * layout_size)
+    pdb.gimp_image_select_rectangle (img, gimpenums.CHANNEL_OP_REPLACE, col * tileSize, row * tileSize, tileSize, tileSize)
+    pdb.gimp_edit_copy(layer)
+
+#----------------------------------------------------------------------
+# 
+#----------------------------------------------------------------------
 def do_make_square_seamless_tile(image, source_layer, tileSize):
     img = gimp.Image(tileSize,tileSize,gimpenums.RGB)
     orig = gimp.Layer(img, "Orig", img.width,img.height,gimpenums.RGBA_IMAGE,100, gimpenums.NORMAL_MODE)
@@ -207,12 +217,6 @@ def do_render_wang(image, drawable, tileSize):
         tiles[row][col] = north_part | west_part | east_part | south_part
     return tiles
 
-  def select_tile(img, layer, index):
-    image_index = number.index(index)
-    row = image_index / layout_size
-    col = image_index - (row * layout_size)
-    pdb.gimp_image_select_rectangle (img, gimpenums.CHANNEL_OP_REPLACE, col * tileSize, row * tileSize, tileSize, tileSize)
-    pdb.gimp_edit_copy(layer)
   def paste_tile(img, layer, row, col):
     fsel = pdb.gimp_edit_paste(layer, False)
     pdb.gimp_layer_set_offsets(fsel, 0, 0)
@@ -235,7 +239,7 @@ def do_render_wang(image, drawable, tileSize):
 #----------------------------------------------------------------------
 #
 #----------------------------------------------------------------------
-def do_export(image, output_path, mask=None, background=None, tileSize=64):
+def do_export(image, drawable, output_path, mask=None, background=None, tileSize=64):
   pad = 1
   def save_wang_transition(tile, bk, mask_pos_x, mask_pos_y, name):
     layer = make_transition_layer(image, tile, mask, bk, tileSize, mask_pos_x, mask_pos_y, name)
@@ -245,33 +249,25 @@ def do_export(image, output_path, mask=None, background=None, tileSize=64):
     layer = pdb.gimp_item_transform_scale(layer, 0, 0, 2 * tileSize, tileSize)
     image.remove_layer(layer)
   
-  def save_wang_tile(layer):
-    wang_bk_layer = get_layer(image, "WangBackground")
-    pdb.gimp_image_select_rectangle (image, gimpenums.CHANNEL_OP_REPLACE, layer.offsets[0], layer.offsets[1], tileSize, tileSize)
-    pdb.gimp_edit_copy(wang_bk_layer)
-    bk = pdb.gimp_edit_paste(layer, False)
-    pdb.gimp_floating_sel_to_layer(bk)
-    pdb.gimp_drawable_set_visible(bk, True) 
-    #create a temp layer
-    copy = pdb.gimp_layer_new_from_drawable(layer, image)
-    image.add_layer(copy)
-    pdb.gimp_drawable_set_visible(copy, True) 
-    pdb.gimp_layer_remove_mask(copy, gimpenums.MASK_APPLY)
-    
-    copy = pdb.gimp_image_merge_down(image,copy,gimpenums.EXPAND_AS_NECESSARY)
+  def save_wang_tile(layer, tileIndex):
+    select_tile(image, layer, tileIndex)
+    copy = pdb.gimp_edit_paste(layer, False)
     copy = to_iso_tile(copy, tileSize, 1)
-    copy.name = "wang_{}".format(layer.name)
+    copy.name = "wang_{}".format(tileIndex)
     return copy
   
-  for layer in image.layers:
-    if layer.name.isdigit():
-      copy = save_wang_tile(layer)
-      save_layer(output_path,tileSize, copy)
-      image.remove_layer(copy)
+  for index in range(0,16):
+    copy = save_wang_tile(drawable, index)
+    save_layer(output_path,tileSize, copy)
+    image.remove_layer(copy)
+
   #create transitions using the mask
   if mask is not None and background is not None:
-    empty_tile = get_layer(image, "0")
-    copy = save_wang_tile(empty_tile)
+    select_tile(image, drawable, 0)
+    copy = pdb.gimp_edit_paste(drawable, False)
+    pdb.gimp_floating_sel_to_layer(copy)
+    to_iso_tile(copy, tileSize, 1)
+    
     #copy the mask
     save_wang_transition(copy, background, 0,0, "OutsideTop")
     save_wang_transition(copy, background, 0,1, "OutsideLeft")
@@ -363,6 +359,7 @@ register(
   "RGB*, GRAY*",
   [
     (PF_IMAGE, "image", "Input image", None),
+    (PF_DRAWABLE, "drawable", "Input drawable", None),
     (PF_DIRNAME, "output_path", _("Output Path"), os.getcwd()),
     (PF_DRAWABLE, "mask", "Transitions Mask", None),
     (PF_DRAWABLE, "background", "Background", None),
