@@ -74,7 +74,7 @@ def make_transition_layer(image, tile, mask, background, tileSize, mask_pos_x, m
   image.add_layer(tile_bkgn)
   image.add_layer(tile_copy)
   pdb.gimp_layer_set_offsets(tile_bkgn, 0, 0)
-  pdb.gimp_layer_set_offsets(tile_copy, -1, -1)
+  pdb.gimp_layer_set_offsets(tile_copy, 0, 0)
       
   do_select_tile(mask, mask_pos_x, mask_pos_y, tileSize)
   pdb.gimp_edit_copy(mask)
@@ -242,7 +242,7 @@ def do_render_wang(image, drawable, tileSize):
 def do_export(image, drawable, output_path, mask=None, background=None, tileSize=64):
   pad = 1
   def save_wang_transition(tile, bk, mask_pos_x, mask_pos_y, name):
-    layer = make_transition_layer(image, tile, mask, bk, tileSize, mask_pos_x, mask_pos_y, name)
+    layer = make_transition_layer(image, tile, mask, bk, tileSize, mask_pos_x, mask_pos_y, name, pad=4)
     fullpath = os.path.join(output_path, name) + ".png"
     layer = pdb.gimp_item_transform_scale(layer, -pad, -pad, 2 * tileSize + pad, tileSize+pad)
     pdb.gimp_file_save(image, layer, fullpath, name)
