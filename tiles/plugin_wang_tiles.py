@@ -228,7 +228,7 @@ def do_render_wang(image, drawable, tileSize):
   img.add_layer(demo)
 
   tiles = pick_tiles()
-  pdb.gimp_message(tiles)
+  #pdb.gimp_message(tiles)
   for row in range(canvas_size):
       for col in range(canvas_size):
         index = tiles[row][col]
